@@ -61,7 +61,7 @@ vector<Territory*> Player::toAttack(){
 void Player::issueOrder(){
     Order* order =new Order();
     ordersList->add(order);
-
+    cout<< "===a new order was added: ===" << endl;
 }
 
 

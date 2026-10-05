@@ -27,6 +27,9 @@ void testPlayer(){
     // show toAttack()
     player1->toAttack();
 
+    //add orders to the player's order list
+    player1->issueOrder();
+
 
     // free memory
     delete player1;
