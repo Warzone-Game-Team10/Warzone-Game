@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <ostream>
+#include <unordered_map>
 
 /**
  * Continent class implementation
@@ -11,6 +12,7 @@ Continent::Continent(const std::string& name, int controlBonus)
 
 Continent::Continent(const Continent& other) = default;
 
+// assignment operator: copy another continent's name and control bonus
 Continent& Continent::operator=(const Continent& other) = default;
 
 Continent::~Continent() = default;
@@ -41,6 +43,7 @@ Territory::Territory(int id, const std::string& name, Continent* continent)
 
 Territory::Territory(const Territory& other) = default;
 
+// assignment operator: copy another territory's values and non-owning links
 Territory& Territory::operator=(const Territory& other) = default;
 
 Territory::~Territory() = default;
@@ -113,4 +116,85 @@ std::ostream& operator<<(std::ostream& out, const Territory& territory) {
     }
 
     return out << "]}";
+}
+
+/**
+ * Map class implementation
+ */
+Map::Map() = default;
+
+Map::Map(const Map& other) {
+    std::unordered_map<const Continent*, Continent*> continentCopies;
+    std::unordered_map<const Territory*, Territory*> territoryCopies;
+
+    // copy continents and record their replacements
+    for (const auto& original : other.continents) {
+        Continent* copy = addContinent(original->getName(), original->getControlBonus());
+        continentCopies.emplace(original.get(), copy);
+    }
+
+    // copy territories before rebuilding their links
+    for (const auto& original : other.territories) {
+        Territory* copy = addTerritory(original->getId(), original->getName());
+        copy->setArmyCount(original->getArmyCount());
+        copy->setOwner(original->getOwner());
+        territoryCopies.emplace(original.get(), copy);
+    }
+
+    // rebuild continent membership and adjacency
+    for (const auto& original : other.territories) {
+        Territory* copy = territoryCopies.at(original.get());
+        if (original->getContinent()) {
+            copy->setContinent(continentCopies.at(original->getContinent()));
+        }
+        for (const Territory* adjacent : original->getAdjacentTerritories()) {
+            Territory* copiedNeighbor = nullptr;
+            if (adjacent) {
+                copiedNeighbor = territoryCopies.at(adjacent);
+            }
+            copy->addAdjacentTerritory(copiedNeighbor);
+        }
+    }
+}
+
+// assignment operator: replace this map with a deep copy of another map
+Map& Map::operator=(const Map& other) {
+    if (this != &other) {
+        Map replacement(other);
+        continents.swap(replacement.continents);
+        territories.swap(replacement.territories);
+        // replacement automatically deletes the old objects when it leaves scope
+    }
+    return *this;
+}
+
+Map::~Map() = default;
+
+// getters
+const std::vector<std::unique_ptr<Continent>>& Map::getContinents() const {
+    return continents;
+}
+
+const std::vector<std::unique_ptr<Territory>>& Map::getTerritories() const {
+    return territories;
+}
+
+// territory management
+Territory* Map::addTerritory(int id, const std::string& name, Continent* continent) {
+    territories.push_back(std::make_unique<Territory>(id, name, continent));
+    return territories.back().get();
+}
+
+// continent management
+Continent* Map::addContinent(const std::string& name, int controlBonus) {
+    continents.push_back(std::make_unique<Continent>(name, controlBonus));
+    return continents.back().get();
+}
+
+/**
+ * stream insertion operator
+ */
+std::ostream& operator<<(std::ostream& out, const Map& map) {
+    return out << "Map{continents=" << map.continents.size()
+               << ", territories=" << map.territories.size() << "}";
 }

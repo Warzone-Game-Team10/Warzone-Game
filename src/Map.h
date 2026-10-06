@@ -1,6 +1,7 @@
 #pragma once
 
 #include <iosfwd>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -64,4 +65,31 @@ public:
 
     // stream insertion operator
     friend std::ostream& operator<<(std::ostream& out, const Territory& territory);
+};
+
+/**
+ * The Map class represents the game map as a connected graph of territories grouped into continents
+ */
+class Map {
+private:
+    std::vector<std::unique_ptr<Continent>> continents;
+    std::vector<std::unique_ptr<Territory>> territories;
+
+public:
+    Map();
+    Map(const Map& other); // copy constructor
+    Map& operator=(const Map& other); // assignment operator
+    ~Map(); // destructor
+
+    // getters
+    const std::vector<std::unique_ptr<Continent>>& getContinents() const;
+    const std::vector<std::unique_ptr<Territory>>& getTerritories() const;
+
+    // object creation
+    Continent* addContinent(const std::string& name, int controlBonus);
+    Territory* addTerritory(int id, const std::string& name,
+                            Continent* continent = nullptr);
+
+    // stream insertion operator
+    friend std::ostream& operator<<(std::ostream& out, const Map& map);
 };
