@@ -369,7 +369,8 @@ std::unique_ptr<Map> MapLoader::loadMap(const std::string& filename) const {
                     parseBorderSection(fields, countries);
                     break;
                 case ParseState::None:
-                    throw std::invalid_argument("data before a recognized section");
+                    parsePreamble(fields[0]);
+                    break;
             }
         }
         if (input.bad()) {
@@ -394,6 +395,13 @@ std::vector<std::string> MapLoader::splitLine(const std::string& line) {
         fields.push_back(field);
     }
     return fields;
+}
+
+// ignore recognized metadata because it is not part of the graph model
+void MapLoader::parsePreamble(const std::string& keyword) {
+    if (keyword != "test" && keyword != "name" && keyword != "ver" && keyword != "circle") {
+        throw std::invalid_argument("data before a recognized section");
+    }
 }
 
 // converts the token to an integer and validate that the whole token is numeric

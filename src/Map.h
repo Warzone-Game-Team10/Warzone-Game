@@ -113,6 +113,7 @@ private:
 
     // parsing helpers
     static std::vector<std::string> splitLine(const std::string& line);
+    static void parsePreamble(const std::string& keyword);
     static int parseInteger(const std::string& token);
     static ParseState parseSection(const std::vector<std::string>& fields,
                                    ParseState currentState, const Map& map);
@@ -128,7 +129,7 @@ public:
     MapLoader& operator=(const MapLoader& other); // assignment operator
     ~MapLoader(); // destructor
 
-    // map loading: caller owns the result
+    // caller owns the parsed map; call validate() separately for structural rules
     std::unique_ptr<Map> loadMap(const std::string& filename) const;
 
     // stream insertion operator
