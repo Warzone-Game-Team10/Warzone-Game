@@ -1,8 +1,13 @@
 #include "Map.h"
 
 #include <algorithm>
+#include <charconv>
+#include <fstream>
+#include <sstream>
+#include <stdexcept>
 #include <ostream>
 #include <unordered_map>
+#include <unordered_set>
 
 /**
  * Continent class implementation
@@ -197,4 +202,292 @@ Continent* Map::addContinent(const std::string& name, int controlBonus) {
 std::ostream& operator<<(std::ostream& out, const Map& map) {
     return out << "Map{continents=" << map.continents.size()
                << ", territories=" << map.territories.size() << "}";
+}
+
+// checks reachability (both forward and backward) to establish mutual reachability between territories
+bool Map::isConnected(const std::vector<const Territory*>& nodes) {
+    if (nodes.empty()) {
+        return false;
+    }
+    const std::unordered_set<const Territory*> members(nodes.begin(), nodes.end());
+    std::unordered_map<const Territory*, std::vector<const Territory*>> reverseEdges;
+    for (const Territory* node : nodes) {
+        for (const Territory* neighbor : node->getAdjacentTerritories()) {
+            if (members.contains(neighbor)) {
+                reverseEdges[neighbor].push_back(node);
+            }
+        }
+    }
+
+    const auto reachesAll = [&](bool reverse) {
+        std::unordered_set<const Territory*> visited;
+        std::vector<const Territory*> pending{nodes.front()};
+        visited.insert(nodes.front());
+        while (!pending.empty()) {
+            const Territory* current = pending.back();
+            pending.pop_back();
+            if (reverse) {
+                for (const Territory* neighbor : reverseEdges[current]) {
+                    if (visited.insert(neighbor).second) {
+                        pending.push_back(neighbor);
+                    }
+                }
+            } else {
+                for (const Territory* neighbor : current->getAdjacentTerritories()) {
+                    if (members.contains(neighbor) && visited.insert(neighbor).second) {
+                        pending.push_back(neighbor);
+                    }
+                }
+            }
+        }
+        return visited.size() == nodes.size();
+    };
+    return reachesAll(false) && reachesAll(true);
+}
+
+// validates the connectivity of the entire directed territory graph
+bool Map::isConnectedGraph() const {
+    if (!hasValidLinks()) {
+        return false;
+    }
+    std::vector<const Territory*> nodes;
+    for (const auto& territory : territories) {
+        nodes.push_back(territory.get());
+    }
+    return isConnected(nodes);
+}
+
+// checks that all territories within each continent are connected
+bool Map::areContinentsConnected() const {
+    if (!eachTerritoryBelongsToOneContinent() || !hasValidLinks()) {
+        return false;
+    }
+    for (const auto& continent : continents) {
+        std::vector<const Territory*> nodes;
+        for (const auto& territory : territories) {
+            if (territory->getContinent() == continent.get()) {
+                nodes.push_back(territory.get());
+            }
+        }
+        if (!isConnected(nodes)) {
+            return false;
+        }
+    }
+    return true;
+}
+
+// validate: combines membership and connectivity requirements
+bool Map::validate() const {
+    return eachTerritoryBelongsToOneContinent()
+        && isConnectedGraph() && areContinentsConnected();
+}
+
+// validates that every territory is assigned to exactly one continent in this map
+bool Map::eachTerritoryBelongsToOneContinent() const {
+    if (territories.empty() || continents.empty()) {
+        return false;
+    }
+    std::unordered_set<const Continent*> ownedContinents;
+    for (const auto& continent : continents) {
+        ownedContinents.insert(continent.get());
+    }
+    for (const auto& territory : territories) {
+        if (!ownedContinents.contains(territory->getContinent())) {
+            return false;
+        }
+    }
+    return true;
+}
+
+// checks that every adjacent territory belongs to this map
+bool Map::hasValidLinks() const {
+    std::unordered_set<const Territory*> ownedTerritories;
+    for (const auto& territory : territories) {
+        ownedTerritories.insert(territory.get());
+    }
+    for (const auto& territory : territories) {
+        for (const Territory* neighbor : territory->getAdjacentTerritories()) {
+            if (!ownedTerritories.contains(neighbor)) {
+                return false;
+            }
+        }
+    }
+    return true;
+}
+
+/**
+ * MapLoader class implementation
+ */
+MapLoader::MapLoader() = default;
+
+MapLoader::MapLoader(const MapLoader& other) = default;
+
+// assignment operator
+MapLoader& MapLoader::operator=(const MapLoader& other) = default;
+
+MapLoader::~MapLoader() = default;
+
+// map loading
+std::unique_ptr<Map> MapLoader::loadMap(const std::string& filename) const {
+    std::ifstream input(filename);
+    if (!input) {
+        throw std::runtime_error(filename + ": cannot open map file");
+    }
+
+    auto map = std::make_unique<Map>();
+    ParseState currentState = ParseState::None;
+    std::unordered_map<int, Territory*> countries;
+    std::string line;
+    std::size_t lineNumber = 0;
+
+    // parse the file line by line, if parsing fails --> the partially built map is cleaned up automatically
+    try {
+        while (std::getline(input, line)) {
+            ++lineNumber;
+            if (lineNumber == 1 && line.starts_with("\xEF\xBB\xBF")) {
+                line.erase(0, 3);
+            }
+            const auto fields = splitLine(line);
+            if (fields.empty()) {
+                continue;
+            }
+            if (fields[0].starts_with('[')) {
+                currentState = parseSection(fields, currentState, *map);
+                continue;
+            }
+
+            switch (currentState) {
+                case ParseState::Files:
+                    break; 
+                case ParseState::Continents:
+                    parseContinentSection(*map, fields);
+                    break;
+                case ParseState::Countries:
+                    parseCountrySection(*map, fields, countries);
+                    break;
+                case ParseState::Borders:
+                    parseBorderSection(fields, countries);
+                    break;
+                case ParseState::None:
+                    throw std::invalid_argument("data before a recognized section");
+            }
+        }
+        if (input.bad()) {
+            throw std::runtime_error(filename + ": map read failed");
+        }
+        if (currentState != ParseState::Borders) {
+            throw std::invalid_argument("missing required map sections");
+        }
+    } catch (const std::invalid_argument& error) {
+        throw std::invalid_argument(filename + ":" + std::to_string(lineNumber)
+                                    + ": " + error.what());
+    }
+    return map;
+}
+
+// splits the line into fields and ignore anything after a semicolon comment
+std::vector<std::string> MapLoader::splitLine(const std::string& line) {
+    std::istringstream row(line.substr(0, line.find(';')));
+    std::vector<std::string> fields;
+    std::string field;
+    while (row >> field) {
+        fields.push_back(field);
+    }
+    return fields;
+}
+
+// converts the token to an integer and validate that the whole token is numeric
+int MapLoader::parseInteger(const std::string& token) {
+    int value = 0;
+    const auto result = std::from_chars(token.data(), token.data() + token.size(), value);
+    if (result.ec != std::errc() || result.ptr != token.data() + token.size()) {
+        throw std::invalid_argument("invalid integer: " + token);
+    }
+    return value;
+}
+
+MapLoader::ParseState MapLoader::parseSection(const std::vector<std::string>& fields,
+                                              ParseState currentState, const Map& map) {
+    if (fields.size() != 1) {
+        throw std::invalid_argument("invalid section header");
+    }
+    const std::string& header = fields[0];
+    if (header == "[files]" && currentState == ParseState::None) {
+        return ParseState::Files;
+    }
+    if (header == "[continents]"
+        && (currentState == ParseState::None || currentState == ParseState::Files)) {
+        return ParseState::Continents;
+    }
+    if (header == "[countries]" && currentState == ParseState::Continents) {
+        if (map.getContinents().empty()) {
+            throw std::invalid_argument("no continents");
+        }
+        return ParseState::Countries;
+    }
+    if (header == "[borders]" && currentState == ParseState::Countries) {
+        if (map.getTerritories().empty()) {
+            throw std::invalid_argument("no countries");
+        }
+        return ParseState::Borders;
+    }
+    throw std::invalid_argument("unknown, repeated, or out-of-order section: " + header);
+}
+
+// reads the continent name, control bonus, and display color
+void MapLoader::parseContinentSection(Map& map, const std::vector<std::string>& fields) {
+    if (fields.size() != 3) {
+        throw std::invalid_argument("expected continent name, bonus, and color");
+    }
+    const int bonus = parseInteger(fields[1]);
+    if (bonus < 0) {
+        throw std::invalid_argument("negative continent bonus");
+    }
+    map.addContinent(fields[0], bonus);
+}
+
+// create a territory and record its explicit ID for border lookup
+void MapLoader::parseCountrySection(Map& map, const std::vector<std::string>& fields,
+                                    std::unordered_map<int, Territory*>& countries) {
+    if (fields.size() != 5) {
+        throw std::invalid_argument("expected country ID, name, continent ID, x, and y");
+    }
+    const int id = parseInteger(fields[0]);
+    const int continentId = parseInteger(fields[2]);
+    parseInteger(fields[3]); // coordinates are read but not stored
+    parseInteger(fields[4]);
+    if (id <= 0 || countries.contains(id)) {
+        throw std::invalid_argument("invalid or duplicate country ID: " + fields[0]);
+    }
+    if (continentId <= 0
+        || static_cast<std::size_t>(continentId) > map.getContinents().size()) {
+        throw std::invalid_argument("unknown continent ID: " + fields[2]);
+    }
+    // continent IDs are based on the index of the continent in the vector
+    Continent* continent = map.getContinents()[continentId - 1].get();
+    countries.emplace(id, map.addTerritory(id, fields[1], continent));
+}
+
+// link existing territories in the direction listed by each border record
+void MapLoader::parseBorderSection(const std::vector<std::string>& fields,
+                                   const std::unordered_map<int, Territory*>& countries) {
+    const int sourceId = parseInteger(fields[0]);
+    if (!countries.contains(sourceId)) {
+        throw std::invalid_argument("unknown border source: " + fields[0]);
+    }
+    Territory* source = countries.at(sourceId);
+    for (std::size_t i = 1; i < fields.size(); ++i) {
+        const int targetId = parseInteger(fields[i]);
+        if (!countries.contains(targetId)) {
+            throw std::invalid_argument("unknown border target: " + fields[i]);
+        }
+        source->addAdjacentTerritory(countries.at(targetId));
+    }
+}
+
+/**
+ * stream insertion operator
+ */
+std::ostream& operator<<(std::ostream& out, const MapLoader&) {
+    return out << "MapLoader{format=Domination}";
 }

@@ -75,6 +75,10 @@ private:
     std::vector<std::unique_ptr<Continent>> continents;
     std::vector<std::unique_ptr<Territory>> territories;
 
+    // validation helpers
+    bool hasValidLinks() const;
+    static bool isConnected(const std::vector<const Territory*>& nodes);
+
 public:
     Map();
     Map(const Map& other); // copy constructor
@@ -90,6 +94,42 @@ public:
     Territory* addTerritory(int id, const std::string& name,
                             Continent* continent = nullptr);
 
+    bool isConnectedGraph() const;
+    bool areContinentsConnected() const;
+    bool eachTerritoryBelongsToOneContinent() const;
+    bool validate() const;
+
     // stream insertion operator
     friend std::ostream& operator<<(std::ostream& out, const Map& map);
+};
+
+/**
+ * The MapLoader class reads Domination map files and builds map objects
+ */
+class MapLoader {
+private:
+    enum class ParseState { None, Files, Continents, Countries, Borders };
+
+    // parsing helpers
+    static std::vector<std::string> splitLine(const std::string& line);
+    static int parseInteger(const std::string& token);
+    static ParseState parseSection(const std::vector<std::string>& fields,
+                                   ParseState currentState, const Map& map);
+    static void parseContinentSection(Map& map, const std::vector<std::string>& fields);
+    static void parseCountrySection(Map& map, const std::vector<std::string>& fields,
+                                    std::unordered_map<int, Territory*>& countries);
+    static void parseBorderSection(const std::vector<std::string>& fields,
+                                   const std::unordered_map<int, Territory*>& countries);
+
+public:
+    MapLoader();
+    MapLoader(const MapLoader& other); // copy constructor
+    MapLoader& operator=(const MapLoader& other); // assignment operator
+    ~MapLoader(); // destructor
+
+    // map loading: caller owns the result
+    std::unique_ptr<Map> loadMap(const std::string& filename) const;
+
+    // stream insertion operator
+    friend std::ostream& operator<<(std::ostream& out, const MapLoader& loader);
 };
