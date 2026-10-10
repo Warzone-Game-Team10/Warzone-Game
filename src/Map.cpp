@@ -250,6 +250,11 @@ bool Map::isConnectedGraph() const {
     if (!hasValidLinks()) {
         return false;
     }
+    return hasConnectedTerritories();
+}
+
+// traverse owned territories after checking links
+bool Map::hasConnectedTerritories() const {
     std::vector<const Territory*> nodes;
     for (const auto& territory : territories) {
         nodes.push_back(territory.get());
@@ -262,6 +267,11 @@ bool Map::areContinentsConnected() const {
     if (!eachTerritoryBelongsToOneContinent() || !hasValidLinks()) {
         return false;
     }
+    return hasConnectedContinents();
+}
+
+// traverse each continent after checking membership and links
+bool Map::hasConnectedContinents() const {
     for (const auto& continent : continents) {
         std::vector<const Territory*> nodes;
         for (const auto& territory : territories) {
@@ -279,7 +289,7 @@ bool Map::areContinentsConnected() const {
 // validate: combines membership and connectivity requirements
 bool Map::validate() const {
     return eachTerritoryBelongsToOneContinent()
-        && isConnectedGraph() && areContinentsConnected();
+        && hasValidLinks() && hasConnectedTerritories() && hasConnectedContinents();
 }
 
 // validates that every territory is assigned to exactly one continent in this map
@@ -352,7 +362,7 @@ std::unique_ptr<Map> MapLoader::loadMap(const std::string& filename) const {
                 continue;
             }
             if (fields[0].starts_with('[')) {
-                currentState = parseSection(fields, currentState, *map);
+                currentState = parseSection(fields, currentState);
                 continue;
             }
 
@@ -415,7 +425,7 @@ int MapLoader::parseInteger(const std::string& token) {
 }
 
 MapLoader::ParseState MapLoader::parseSection(const std::vector<std::string>& fields,
-                                              ParseState currentState, const Map& map) {
+                                              ParseState currentState) {
     if (fields.size() != 1) {
         throw std::invalid_argument("invalid section header");
     }
@@ -428,15 +438,9 @@ MapLoader::ParseState MapLoader::parseSection(const std::vector<std::string>& fi
         return ParseState::Continents;
     }
     if (header == "[countries]" && currentState == ParseState::Continents) {
-        if (map.getContinents().empty()) {
-            throw std::invalid_argument("no continents");
-        }
         return ParseState::Countries;
     }
     if (header == "[borders]" && currentState == ParseState::Countries) {
-        if (map.getTerritories().empty()) {
-            throw std::invalid_argument("no countries");
-        }
         return ParseState::Borders;
     }
     throw std::invalid_argument("unknown, repeated, or out-of-order section: " + header);

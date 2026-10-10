@@ -78,6 +78,9 @@ private:
 
     // validation helpers
     bool hasValidLinks() const;
+    // traversal helpers
+    bool hasConnectedTerritories() const;
+    bool hasConnectedContinents() const;
     static bool isConnected(const std::vector<const Territory*>& nodes);
 
 public:
@@ -116,7 +119,7 @@ private:
     static void parsePreamble(const std::string& keyword);
     static int parseInteger(const std::string& token);
     static ParseState parseSection(const std::vector<std::string>& fields,
-                                   ParseState currentState, const Map& map);
+                                   ParseState currentState);
     static void parseContinentSection(Map& map, const std::vector<std::string>& fields);
     static void parseCountrySection(Map& map, const std::vector<std::string>& fields,
                                     std::unordered_map<int, Territory*>& countries);
