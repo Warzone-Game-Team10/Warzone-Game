@@ -128,42 +128,88 @@ void checkValidation(const Map& map, bool graph, bool continents, bool membershi
     check(map.validate() == (graph && continents && membership), description + ": combined validation");
 }
 
-// test valid and invalid map structures
-void testValidation(const fs::path& mapDirectory) {
-    std::cout << "\n--- INDIVIDUAL VALIDATION CHECKS ---\n";
+// test disconnected maps and continents using map files
+void testDisconnectedFixtures(const fs::path& mapDirectory) {
     MapLoader loader;
     checkValidation(*loader.loadMap((mapDirectory / "tests/invalid_maps/disconnected_map.map").string()),
                     false, true, true, "disconnected map with connected continents");
     checkValidation(*loader.loadMap((mapDirectory / "tests/invalid_maps/disconnected_continent.map").string()),
                     true, false, true, "connected map with disconnected continent");
+}
+
+// test empty maps and maps with only one territory
+void testEmptyAndSingletonMaps() {
     Map map;
     checkValidation(map, false, false, false, "empty map is invalid");
     Continent* continent = map.addContinent("North", 0);
-    Territory* first = map.addTerritory(1, "A", continent);
+    map.addTerritory(1, "A", continent);
     checkValidation(map, true, true, true, "single territory and zero-bonus continent are valid");
-    first->setContinent(nullptr);
+}
+
+// test territories with no continent assigned
+void testMissingMembership() {
+    Map map;
+    map.addContinent("North", 0);
+    map.addTerritory(1, "A");
     checkValidation(map, true, false, false, "missing continent membership is invalid");
+}
+
+// test territories assigned to a continent outside the map
+void testForeignMembership() {
     Continent foreign("Foreign", 1);
-    first->setContinent(&foreign);
+    Map map;
+    map.addContinent("North", 0);
+    map.addTerritory(1, "A", &foreign);
     checkValidation(map, true, false, false, "foreign continent membership is invalid");
-    first->setContinent(continent);
+}
+
+// test one-way and two-way reachability between territories
+void testDirectedConnectivity() {
+    Map map;
+    Continent* continent = map.addContinent("North", 0);
+    Territory* first = map.addTerritory(1, "A", continent);
     Territory* second = map.addTerritory(2, "B", continent);
     first->addAdjacentTerritory(second);
     checkValidation(map, false, false, true, "one-way reachability is not mutual reachability");
     second->addAdjacentTerritory(first);
     checkValidation(map, true, true, true, "mutual reachability satisfies connectivity");
+}
+
+// test that continents with no territories are rejected
+void testEmptyContinent() {
+    Map map;
+    Continent* continent = map.addContinent("North", 0);
+    map.addTerritory(1, "A", continent);
     map.addContinent("Empty", 1);
     checkValidation(map, true, false, true, "empty continent is invalid");
-    first->addAdjacentTerritory(nullptr);
+}
+
+// test validation and copying of null adjacency links
+void testNullAdjacency() {
+    Map map;
+    Continent* continent = map.addContinent("North", 0);
+    map.addTerritory(1, "A", continent)->addAdjacentTerritory(nullptr);
     checkValidation(map, false, false, true, "null adjacency is rejected safely");
     Map nullCopy(map);
-    check(nullCopy.getTerritories().at(0)->getAdjacentTerritories().at(1) == nullptr,
+    check(nullCopy.getTerritories().at(0)->getAdjacentTerritories().at(0) == nullptr,
           "map copying preserves null links");
+}
+
+// test adjacency links to territories outside the map
+void testForeignAdjacency() {
+    Territory external(3, "External");
+    Map map;
+    Continent* home = map.addContinent("Home", 1);
+    map.addTerritory(1, "A", home)->addAdjacentTerritory(&external);
+    checkValidation(map, false, false, true, "foreign adjacency is rejected safely");
+}
+
+// test that failed assignment preserves the destination map
+void testFailedMapAssignment() {
     Territory external(3, "External");
     Map foreignLinks;
     Continent* home = foreignLinks.addContinent("Home", 1);
     foreignLinks.addTerritory(1, "A", home)->addAdjacentTerritory(&external);
-    checkValidation(foreignLinks, false, false, true, "foreign adjacency is rejected safely");
     Map target;
     target.addContinent("Retained", 2);
     bool rejected = false;
@@ -176,6 +222,10 @@ void testValidation(const fs::path& mapDirectory) {
           && target.getContinents().at(0)->getName() == "Retained",
           "failed graph assignment preserves the target");
 
+}
+
+// test copying maps with duplicate names and IDs
+void testCopyWithDuplicateLabels() {
     Map duplicates;
     Continent* left = duplicates.addContinent("Same", 1);
     Continent* right = duplicates.addContinent("Same", 1);
@@ -185,6 +235,21 @@ void testValidation(const fs::path& mapDirectory) {
     check(duplicateCopy.getTerritories().at(0)->getContinent() == duplicateCopy.getContinents().at(0).get()
           && duplicateCopy.getTerritories().at(1)->getContinent() == duplicateCopy.getContinents().at(1).get(),
           "graph copying distinguishes objects with duplicate labels and IDs");
+}
+
+// run validation and copy tests with separate map setups
+void testValidation(const fs::path& mapDirectory) {
+    std::cout << "\n--- INDIVIDUAL VALIDATION CHECKS ---\n";
+    testDisconnectedFixtures(mapDirectory);
+    testEmptyAndSingletonMaps();
+    testMissingMembership();
+    testForeignMembership();
+    testDirectedConnectivity();
+    testEmptyContinent();
+    testNullAdjacency();
+    testForeignAdjacency();
+    testFailedMapAssignment();
+    testCopyWithDuplicateLabels();
 }
 
 // skip validation when parsing fails
@@ -228,6 +293,70 @@ bool hasConquestOneWayBorder(const Map& map) {
         && std::find(reverse.begin(), reverse.end(), source) == reverse.end();
 }
 
+// store loading and validation totals for the test summary
+struct MapTestSummary {
+    std::size_t loaded = 0;
+    std::size_t rejected = 0;
+    std::size_t validMaps = 0;
+    std::size_t invalidGraphs = 0;
+    std::size_t fileErrors = 0;
+};
+
+// load and validate one map file, then update the test totals
+// return whether the result matches the expected outcome
+bool testMapFile(const MapLoader& loader, const fs::path& file,
+                 const ExpectedResult& expected, bool checkOneWayBorder,
+                 MapTestSummary& summary) {
+    printExpectation(expected);
+    bool passed = false;
+    bool parsed = false;
+
+    try {
+        auto map = loader.loadMap(file.string());
+        parsed = true;
+        ++summary.loaded;
+        std::cout << "Map loaded successfully\n"
+                     "\n--- MAP INFORMATION ---\n"
+                  << "Territories: " << map->getTerritories().size() << '\n'
+                  << "Continents: " << map->getContinents().size() << '\n'
+                  << "\n--- VALIDATION ---\n";
+        const bool connected = map->isConnectedGraph();
+        const bool continentsConnected = map->areContinentsConnected();
+        const bool membership = map->eachTerritoryBelongsToOneContinent();
+        const bool valid = connected && continentsConnected && membership;
+        passed = expected.parses
+            && valid == expected.valid;
+        if (checkOneWayBorder) {
+            const bool directedBorder = hasConquestOneWayBorder(*map);
+            std::cout << "Conquest one-way border preserved: "
+                      << (directedBorder ? "PASS" : "FAIL") << '\n';
+            passed = passed && directedBorder;
+        }
+        std::cout << "1. Map is mutually reachable: " << (connected ? "PASS" : "FAIL") << '\n'
+                  << "2. Each continent is mutually reachable: "
+                  << (continentsConnected ? "PASS" : "FAIL") << '\n'
+                  << "3. Each territory belongs to one map continent: "
+                  << (membership ? "PASS" : "FAIL") << '\n'
+                  << "RESULT: " << (valid ? "VALID MAP" : "REJECTED - STRUCTURALLY INVALID MAP") << '\n';
+        if (valid) {
+            ++summary.validMaps;
+        } else {
+            ++summary.invalidGraphs;
+        }
+    } catch (const std::invalid_argument& error) {
+        passed = !parsed && !expected.parses;
+        ++summary.rejected;
+        std::cout << "RESULT: REJECTED - COULD NOT PARSE MAP\n"
+                  << "Reason: " << error.what() << '\n';
+    } catch (const std::runtime_error& error) {
+        ++summary.fileErrors;
+        std::cout << "RESULT: REJECTED - COULD NOT LOAD FILE\n"
+                  << "Reason: " << error.what() << '\n';
+    }
+    std::cout << "Expectation check: " << (passed ? "PASS" : "FAIL") << '\n';
+    return passed;
+}
+
 } // namespace
 
 /**
@@ -241,12 +370,8 @@ bool testLoadMaps(const fs::path& mapDirectory) {
     std::cout << "Loading core fixtures from: " << fs::absolute(mapDirectory) << '\n';
 
     MapLoader loader;
+    MapTestSummary summary;
     std::size_t testNumber = 0;
-    std::size_t loaded = 0;
-    std::size_t rejected = 0;
-    std::size_t validMaps = 0;
-    std::size_t invalidGraphs = 0;
-    std::size_t fileErrors = 0;
     std::size_t passedTests = 0;
     std::size_t missingFiles = 0;
 
@@ -263,54 +388,7 @@ bool testLoadMaps(const fs::path& mapDirectory) {
                   << "TEST " << ++testNumber << ": " << file.generic_string()
                   << "\n========================================\n";
 
-        printExpectation(expected);
-        bool passed = false;
-        bool parsed = false;
-
-        try {
-            auto map = loader.loadMap(file.string());
-            parsed = true;
-            ++loaded;
-            std::cout << "Map loaded successfully\n"
-                         "\n--- MAP INFORMATION ---\n"
-                      << "Territories: " << map->getTerritories().size() << '\n'
-                      << "Continents: " << map->getContinents().size() << '\n'
-                      << "\n--- VALIDATION ---\n";
-            const bool connected = map->isConnectedGraph();
-            const bool continentsConnected = map->areContinentsConnected();
-            const bool membership = map->eachTerritoryBelongsToOneContinent();
-            const bool valid = connected && continentsConnected && membership;
-            passed = expected.parses
-                && valid == expected.valid;
-            if (filename == "conquest/Conquest.map") {
-                const bool directedBorder = hasConquestOneWayBorder(*map);
-                std::cout << "Conquest one-way border preserved: "
-                          << (directedBorder ? "PASS" : "FAIL") << '\n';
-                passed = passed && directedBorder;
-            }
-            std::cout << "1. Map is mutually reachable: " << (connected ? "PASS" : "FAIL") << '\n'
-                      << "2. Each continent is mutually reachable: "
-                      << (continentsConnected ? "PASS" : "FAIL") << '\n'
-                      << "3. Each territory belongs to one map continent: "
-                      << (membership ? "PASS" : "FAIL") << '\n'
-                      << "RESULT: " << (valid ? "VALID MAP" : "REJECTED - STRUCTURALLY INVALID MAP") << '\n';
-            if (valid) {
-                ++validMaps;
-            } else {
-                ++invalidGraphs;
-            }
-        } catch (const std::invalid_argument& error) {
-            passed = !parsed && !expected.parses;
-            ++rejected;
-            std::cout << "RESULT: REJECTED - COULD NOT PARSE MAP\n"
-                      << "Reason: " << error.what() << '\n';
-        } catch (const std::runtime_error& error) {
-            ++fileErrors;
-            std::cout << "RESULT: REJECTED - COULD NOT LOAD FILE\n"
-                      << "Reason: " << error.what() << '\n';
-        }
-        std::cout << "Expectation check: " << (passed ? "PASS" : "FAIL") << '\n';
-        if (passed) {
+        if (testMapFile(loader, file, expected, filename == "conquest/Conquest.map", summary)) {
             ++passedTests;
         }
     }
@@ -319,11 +397,11 @@ bool testLoadMaps(const fs::path& mapDirectory) {
                  "TEST SUMMARY\n"
                  "========================================\n"
               << "Files tested: " << expectations.size() << '\n'
-              << "Maps loaded: " << loaded << '\n'
-              << "Valid maps: " << validMaps << '\n'
-              << "Invalid graphs rejected: " << invalidGraphs << '\n'
-              << "Malformed files rejected: " << rejected << '\n'
-              << "File errors: " << fileErrors << '\n'
+              << "Maps loaded: " << summary.loaded << '\n'
+              << "Valid maps: " << summary.validMaps << '\n'
+              << "Invalid graphs rejected: " << summary.invalidGraphs << '\n'
+              << "Malformed files rejected: " << summary.rejected << '\n'
+              << "File errors: " << summary.fileErrors << '\n'
               << "Expectation checks passed: " << passedTests << '/' << expectations.size() << '\n'
               << "Missing fixtures: " << missingFiles << '\n'
               << "\nALL FILES PROCESSED\n";
