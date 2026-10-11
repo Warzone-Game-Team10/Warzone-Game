@@ -1,4 +1,5 @@
 #include "Map.h"
+#include "MapDriver.h"
 
 #include <algorithm>
 #include <filesystem>
@@ -408,27 +409,18 @@ bool testLoadMaps(const fs::path& mapDirectory) {
     return passedTests == expectations.size() && missingFiles == 0;
 }
 
-// use maps/ unless a directory is given
-int main(int argc, char* argv[]) {
-    if (argc > 2) {
-        std::cerr << "Usage: " << argv[0] << " [maps-directory]\n";
-        return 1;
+// run the map checks and file tests from one entry point
+bool testMaps(const fs::path& directory) {
+    const fs::path mapDirectory = fs::absolute(directory).lexically_normal();
+    if (!fs::is_directory(mapDirectory)) {
+        std::cerr << "FAIL: maps directory does not exist or is not a directory: " << mapDirectory
+                  << "\nSupply the project maps directory, or run from the repository root.\n";
+        return false;
     }
-    try {
-        const fs::path mapDirectory = fs::absolute(argc == 2 ? argv[1] : "maps").lexically_normal();
-        if (!fs::is_directory(mapDirectory)) {
-            std::cerr << "FAIL: maps directory does not exist or is not a directory: " << mapDirectory
-                      << "\nSupply the project maps directory, or run from the repository root.\n";
-            return 1;
-        }
-        testValueCopies();
-        testMapCopy();
-        testMapAssignment();
-        testStreams();
-        testValidation(mapDirectory);
-        return testLoadMaps(mapDirectory) ? 0 : 1;
-    } catch (const std::exception& error) {
-        std::cerr << "FAIL: " << error.what() << '\n';
-        return 1;
-    }
+    testValueCopies();
+    testMapCopy();
+    testMapAssignment();
+    testStreams();
+    testValidation(mapDirectory);
+    return testLoadMaps(mapDirectory);
 }
