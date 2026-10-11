@@ -1,0 +1,83 @@
+; Middle Earth
+; The card set
+
+[cards]
+Infantry 1
+Cannon 2
+Cavalry 3
+Infantry 4
+Cannon 5 
+Cavalry 6
+Infantry 7
+Cannon 8
+Cavalry 9
+Infantry 10
+Cannon 11
+Cavalry 12
+Infantry 13
+Cannon 14
+Cavalry 15
+Infantry 16
+Cannon 17
+Cavalry 18
+Infantry 19
+Cannon 20
+Cavalry 21
+Infantry 22
+Cannon 23
+Cavalry 24 
+Infantry 25
+Cannon 26
+Cavalry 27
+Infantry 28
+Cannon 29
+Cavalry 30
+Infantry 31
+Cannon 32
+Cavalry 33
+Infantry 34
+Cannon 35
+Cavalry 36
+Infantry 37
+Cannon 38
+Cavalry 39
+Infantry 40
+Cannon 41
+Cavalry 42
+Infantry 43
+Cannon 44
+Cavalry 45
+Infantry 46
+Cannon 47
+Cavalry 48
+Infantry 49
+Cannon 50
+Cavalry 51
+Infantry 52
+Cannon 53
+Cavalry 54
+Infantry 55
+Cannon 56
+wildcard
+wildcard
+
+
+;destroy x occupy x x continents x x x
+;destroy (Player) occupy (int int) continents (Continent Continent Continent)
+; * = any
+[missions]
+0     0  0     1  5  0     Conquer the areas of NORTH ERIADOR and MIRKWOOD.
+0     0  0     3  8  0     Conquer the areas of SOUTH ERIADOR and MORDOR.
+0     0  0     2  7  0     Conquer the areas of THE LANDS OF THE FREE MEN and MIDDLE ERIADOR.
+0     0  0     3  5  0     Conquer the areas of SOUTH ERIADOR and MIRKWOOD.
+0     0  0     1  8  *     Conquer the areas of NORTH ERIADOR and MORDOR and ANY THIRD AREA.
+0     0  0     4  6  0     Conquer the areas of RHOVANION and GONDOR.
+0     0  0     3  7  *     Conquer the areas of SOUTH ERIADOR and LANDS OF THE FREE MEN and ANY THIRD AREA.
+0     0  0     2  7  0     Conquer the areas of MIDDLE ERIADOR and LANDS OF THE FREE MEN.
+0     24 1     0  0  0	   Occupy 24 countries of your choice and occupy each with at least 1 army.
+1     24 1     0  0  0	   Destroy all of PLAYER1's TROOPS. If they are yours or they have already been destroyed by another player then your mission is: Occupy 24 countries.
+2     24 1     0  0  0	   Destroy all of PLAYER2's TROOPS. If they are yours or they have already been destroyed by another player then your mission is: Occupy 24 countries.
+3     24 1     0  0  0	   Destroy all of PLAYER3's TROOPS. If they are yours or they have already been destroyed by another player then your mission is: Occupy 24 countries.
+4     24 1     0  0  0	   Destroy all of PLAYER4's TROOPS. If they are yours or they have already been destroyed by another player then your mission is: Occupy 24 countries.
+5     24 1     0  0  0	   Destroy all of PLAYER5's TROOPS. If they are yours or they have already been destroyed by another player then your mission is: Occupy 24 countries.
+6     24 1     0  0  0	   Destroy all of PLAYER6's TROOPS. If they are yours or they have already been destroyed by another player then your mission is: Occupy 24 countries.

@@ -1,0 +1,132 @@
+; map: Naerr.map
+; map made with the map maker
+; yura.net Risk 1.0.9.7
+
+[files]
+pic Naerr_pic.png
+map Naerr_map.gif
+crd Naerr.cards
+
+[continents]
+Narodhe 5 #66ffff
+Serana 7 #ff33cc
+Kresh 6 #33cc00
+East_Moress 5 #cccc00
+West_Moress 6 #66ff66
+Somrei 6 #ff80f4
+Ocean 1 #8090ff
+Kammara 0 #8091ff
+
+[countries]
+1 Northern_Narodhe 1 178 86
+2 Southern_Narodhe 1 174 144
+3 Western_Narodhe 1 104 112
+4 Kreshdi 3 320 134
+5 Korelli 3 391 154
+6 Daren 3 367 127
+7 Arctic_Peninsula 3 441 57
+8 Effari 3 470 198
+9 Krall 3 443 131
+10 Crelitia 3 434 177
+11 Nambari 3 498 161
+12 Sepiin 2 559 105
+13 The_Hinge 7 491 254
+14 Sortellon 2 616 68
+15 Semarri 2 560 149
+16 Faden 2 535 186
+17 West_Somrei 6 489 337
+18 North_Somrei 6 559 307
+19 East_Somrei 6 598 363
+20 Central_Somrei 6 551 345
+21 Hebus 2 634 212
+22 Barluk 6 601 316
+23 Baracus 7 434 296
+24 Kediel 7 367 269
+25 Harrion 4 262 306
+26 Kellst 4 281 236
+27 Sadha 4 280 354
+28 Moresia 4 282 274
+29 Ketal 4 337 251
+30 Furm 4 299 316
+31 Semai_Archipelago 7 63 171
+32 Habei 5 111 196
+33 Sher 5 84 329
+34 Karei 5 175 317
+35 Dantz 5 217 335
+36 Khaist 5 106 263
+37 Delan 5 210 268
+38 Pahr 5 186 214
+39 Kham 5 162 263
+40 Barei 5 144 340
+41 Semul 7 100 368
+42 Kethil 7 148 36
+43 Seramul 7 614 257
+44 Kairn 7 245 156
+45 Mo-Kreshdi 7 316 160
+46 Mo-Sadha 8 332 411
+47 West_Desert 8 124 415
+48 East_Desert 8 228 423
+49 Duut 8 510 423
+50 Meratuk 8 19 411
+51 Mo-Somrei 8 605 420
+52 Das 8 427 401
+53 Kar 8 434 421
+54 Sharic 6 485 383
+55 Homeri 6 602 398
+
+[borders]
+1 3 2 44 42
+2 1
+3 1 31
+4 6 45
+5 6 9 10 24 45
+6 4 5 9 7
+7 6 14
+8 10 11 16
+9 6 5 10 11
+10 5 8 11 9
+11 10 9 8 16
+12 15 14
+13 16 23 43
+14 12 7
+15 16 12
+16 13 11 8 15
+17 18 20 19 23 54
+18 17 19 20 22
+19 17 18 20 55
+20 17 18 19
+21 31 43
+22 18 43
+23 13 24 17
+24 23 5 29
+25 26 28 30 35
+26 25 28 29
+27 30 46
+28 30 25 26 29
+29 28 26 24
+30 28 27 25
+31 21 3 32
+32 36 38 31
+33 34 36 40 41
+34 37 35 39 33 40
+35 25 34
+36 33 32 39
+37 39 38 34
+38 37 39 32
+39 37 34 36 38
+40 41 34 33
+41 40 33
+42 1
+43 21 22 13
+44 1
+45 4 5
+46 53 52 27 48
+47 48 50
+48 46 47
+49 53 52 51 54
+50 47 51
+51 50 49 55
+52 53 49 46 54
+53 52 46 49
+54 17 52 49
+55 51 19
