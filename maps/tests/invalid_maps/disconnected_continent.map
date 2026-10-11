@@ -1,0 +1,15 @@
+[continents]
+North 3 blue
+South 2 red
+
+[countries]
+1 A 1 10 10
+2 B 2 20 10
+3 C 1 30 10
+4 D 2 40 10
+
+[borders]
+1 2
+2 1 3 4
+3 2 4
+4 2 3

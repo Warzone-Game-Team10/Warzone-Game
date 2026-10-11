@@ -1,0 +1,6 @@
+# compiled executables
+/warzone-map-driver
+/warzone-tests
+
+# macOS files
+.DS_Store
