@@ -1,9 +1,10 @@
 #pragma once
 
 #include <iostream>
-#include <string>
 #include <vector>
+#include <string>
 
+// Five types of Warzone cards
 enum class CardType {
     BOMB,
     REINFORCEMENT,
@@ -16,6 +17,7 @@ class Player;
 class Deck;
 class Hand;
 
+// Represents one card
 class Card {
 private:
     CardType type;
@@ -31,12 +33,14 @@ public:
     CardType getType() const;
     std::string getTypeName() const;
 
+    // Creates an order and returns the played card to the deck
     void play(Player* player, Hand* hand, Deck* deck);
 
     friend std::ostream& operator<<(std::ostream& out,
                                     const Card& card);
 };
 
+// Stores cards available to draw
 class Deck {
 private:
     std::vector<Card*> cards;
@@ -56,10 +60,11 @@ public:
                                     const Deck& deck);
 };
 
+// Stores cards belonging to a player
 class Hand {
 private:
     std::vector<Card*> handCards;
-    Deck* deck; // Non-owning pointer
+    Deck* deck; // Hand does not own the Deck
 
 public:
     Hand(Deck* deck);
@@ -73,12 +78,13 @@ public:
     bool hasCard(Card* card) const;
 
     void playAll(Player* player);
+
     int getSize() const;
     Deck* getDeck() const;
 
     friend std::ostream& operator<<(std::ostream& out,
                                     const Hand& hand);
 };
-
-// Compatibility with the Player class
+// Remove once the Player teammate changes Cards* to Hand*.
 using Cards = Hand;
+
