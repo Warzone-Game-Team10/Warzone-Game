@@ -19,10 +19,7 @@ enum class CardType {
 };
 
 // Forward declarations
-// These tell C++ that the classes exist.
 class Player;
-class Order;
-class OrdersList;
 class Deck;
 class Hand;
 
@@ -51,10 +48,9 @@ public:
     CardType getType() const;
     std::string getTypeName() const;
 
-    // TODO: Connect to Player and Orders.
-    // This will eventually create an Order,
-    // remove the card from Hand, and return
-    // it to Deck.
+    // Plays the card and creates the corresponding order.
+    // The order is added to the player's OrdersList.
+    // The card is then removed from Hand and returned to Deck.
     void play(Player* player, Hand* hand, Deck* deck);
 
     // Stream insertion operator
@@ -85,7 +81,7 @@ public:
     // Draw a random card
     Card* draw();
 
-    // Return a card to the deck
+    // Return a played card to the deck
     void returnCard(Card* card);
 
     // Get number of cards
@@ -97,7 +93,7 @@ public:
 };
 
 // ==========================================
-// HAND CLASS (TODO)
+// HAND CLASS
 // Stores cards held by a player.
 // ==========================================
 
@@ -129,7 +125,8 @@ public:
     // Check whether a card is in the hand
     bool hasCard(Card* card) const;
 
-    // TODO: Play cards through Player/Orders
+    // Play all cards in the hand
+    // TODO: Handle reinforcement before activating
     void playAll(Player* player);
 
     // Get number of cards

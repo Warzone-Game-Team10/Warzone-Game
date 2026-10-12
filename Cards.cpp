@@ -1,11 +1,13 @@
 
 #include "Cards.h"
+#include "Orders.h"
+#include "Player.h"
 
 #include <cstdlib>
 #include <ctime>
 
 // ==========================================
-// CARD CLASS IMPLEMENTATION
+// CARD CLASS 
 // ==========================================
 
 // Default constructor
@@ -80,37 +82,62 @@ void Card::play(Player* player, Hand* hand, Deck* deck) {
         return;
     }
 
-    // Make sure this card is in the hand
+    // Make sure the card is in the hand
     if (!hand->hasCard(this)) {
         std::cout << "Card is not in the hand."
                   << std::endl;
         return;
     }
 
-    std::cout << "Playing " << getTypeName()
-              << " card." << std::endl;
+    // Get the player's OrdersList
+    OrdersList* orders = player->getOrdersList();
 
-    // ======================================
-    // TODO 1: CREATE THE CORRECT ORDER
-    // ======================================
+    if (orders == nullptr) {
+        std::cout << "Player has no OrdersList."
+                  << std::endl;
+        return;
+    }
 
-    // Include Player.h and Orders.h later.
+    Order* newOrder = nullptr;
 
+    // Create the correct order based on card type
+    if (type == CardType::BOMB) {
+        newOrder = new Bomb();
+    }
+    else if (type == CardType::BLOCKADE) {
+        newOrder = new Blockade();
+    }
+    else if (type == CardType::AIRLIFT) {
+        newOrder = new Airlift();
+    }
+    else if (type == CardType::DIPLOMACY) {
+        newOrder = new Negotiate();
+    }
+    else if (type == CardType::REINFORCEMENT) {
 
-    // ======================================
-    // TODO 2: ADD ORDER TO PLAYER
-    // ======================================
+        // TODO: Implement reinforcement effect.
+        // There is no Reinforcement order in Orders.h.
 
-    // ======================================
-    // TODO 3: REMOVE CARD FROM HAND
-    // ======================================
+        std::cout << "Reinforcement card not implemented yet."
+                  << std::endl;
+        return;
+    }
 
+    if (newOrder == nullptr) {
+        return;
+    }
 
-    // ======================================
-    // TODO 4: RETURN CARD TO DECK
-    // ======================================
+    // Add order to player's OrdersList
+    orders->addOrder(newOrder);
 
+    // Remove card from Hand
+    hand->removeCard(this);
 
+    // Return card to Deck
+    deck->returnCard(this);
+
+    std::cout << getTypeName()
+              << " card played." << std::endl;
 }
 
 // Print a Card
@@ -209,9 +236,18 @@ Card* Deck::draw() {
 // Return a card to the deck
 void Deck::returnCard(Card* card) {
 
-    if (card != nullptr) {
-        cards.push_back(card);
+    if (card == nullptr) {
+        return;
     }
+
+    // Check that the card is not already in Deck
+    for (Card* currentCard : cards) {
+        if (currentCard == card) {
+            return;
+        }
+    }
+
+    cards.push_back(card);
 }
 
 // Return number of cards
@@ -287,9 +323,16 @@ Hand& Hand::operator=(const Hand& other) {
 // Add a card to Hand
 void Hand::addCard(Card* card) {
 
-    if (card != nullptr) {
-        handCards.push_back(card);
+    if (card == nullptr) {
+        return;
     }
+
+    // Prevent adding the same pointer twice
+    if (hasCard(card)) {
+        return;
+    }
+
+    handCards.push_back(card);
 }
 
 // Check whether a card is in Hand
@@ -336,8 +379,22 @@ void Hand::playAll(Player* player) {
         return;
     }
 
-    // TODO: Card::play() to be implemented
-   
+    int i = 0;
+
+    while (i < static_cast<int>(handCards.size())) {
+
+        Card* card = handCards[i];
+
+        int oldSize = getSize();
+
+        card->play(player, this, deck);
+
+        // If the card was removed, stay at the same
+        // index because the next card moves into it.
+        if (getSize() == oldSize) {
+            i++;
+        }
+    }
 }
 
 // Return number of cards
