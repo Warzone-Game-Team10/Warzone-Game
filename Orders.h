@@ -24,11 +24,14 @@ public:
     // ASSIGNMENT OPERATOR 
     Order& operator=(const Order& other);   // w/o this C++ defaults to a shallow copy when we assign smth like order1=order2 
 
+    // FRIEND OPERATOR 
+    friend std::ostream& operator<<(std::ostream& outs, const Order& order);
+
     virtual bool validate();       // method which verifies if order is illegal 
     virtual void execute();        // method which executes the game action 
 
 
-private:
+protected:
 
     // a pointer to a string that would hold the order's description 
     std::string* description; 
@@ -153,6 +156,8 @@ public:
     ~OrdersList();                          // destructor 
 
     OrdersList& operator=(const OrdersList& other); // assignment operator 
+
+    friend std::ostream& operator<<(std::ostream& outs, const OrdersList& list); // friend operator 
 
 
     // " After orders are put in the list, the player can move them around in the list 
