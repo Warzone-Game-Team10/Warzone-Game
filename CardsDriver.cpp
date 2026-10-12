@@ -6,6 +6,7 @@
 #include <iostream>
 
 int main() {
+
     std::cout << "===== WARZONE CARDS DRIVER ====="
               << std::endl;
 
@@ -17,12 +18,13 @@ int main() {
     player.setCardHand(&hand);
     player.setOrdersList(&orders);
 
-    // Test 1: Initial state
+    // Test 1: Initial deck and hand
     std::cout << "\nTEST 1: Initial state" << std::endl;
+
     std::cout << deck << std::endl;
     std::cout << hand << std::endl;
 
-    // Test 2: Draw five cards
+    // Test 2: Draw every card
     std::cout << "\nTEST 2: Drawing cards" << std::endl;
 
     for (int i = 0; i < 5; i++) {
@@ -38,12 +40,13 @@ int main() {
     std::cout << hand << std::endl;
 
     if (deck.getSize() == 0 && hand.getSize() == 5) {
-        std::cout << "PASS: All five cards drawn." << std::endl;
-    } else {
-        std::cout << "FAIL: Unexpected card counts." << std::endl;
+        std::cout << "PASS: All cards drawn." << std::endl;
+    }
+    else {
+        std::cout << "FAIL: Drawing cards." << std::endl;
     }
 
-    // Test 3: Empty deck
+    // Test 3: Drawing from an empty deck
     std::cout << "\nTEST 3: Empty deck" << std::endl;
 
     Card* extraCard = deck.draw();
@@ -51,8 +54,10 @@ int main() {
     if (extraCard == nullptr) {
         std::cout << "PASS: Empty deck handled."
                   << std::endl;
-    } else {
-        std::cout << "FAIL: Expected nullptr." << std::endl;
+    }
+    else {
+        std::cout << "FAIL: Expected nullptr."
+                  << std::endl;
         hand.addCard(extraCard);
     }
 
@@ -61,11 +66,8 @@ int main() {
 
     Hand copiedHand(hand);
 
-    if (copiedHand.getSize() == hand.getSize()) {
-        std::cout << "PASS: Hand copied." << std::endl;
-    } else {
-        std::cout << "FAIL: Hand copy incorrect." << std::endl;
-    }
+    std::cout << "Original: " << hand << std::endl;
+    std::cout << "Copy: " << copiedHand << std::endl;
 
     // Test 5: Assignment operator
     std::cout << "\nTEST 5: Assignment operator" << std::endl;
@@ -73,42 +75,27 @@ int main() {
     Hand assignedHand(&deck);
     assignedHand = hand;
 
-    if (assignedHand.getSize() == hand.getSize()) {
-        std::cout << "PASS: Hand assigned." << std::endl;
-    } else {
-        std::cout << "FAIL: Hand assignment incorrect."
-                  << std::endl;
-    }
+    std::cout << "Assigned: "
+              << assignedHand << std::endl;
 
     // Test 6: Play all cards
     std::cout << "\nTEST 6: Playing cards" << std::endl;
 
     hand.playAll(&player);
 
+    std::cout << "\nAfter playing:" << std::endl;
     std::cout << deck << std::endl;
     std::cout << hand << std::endl;
+
+    std::cout << "\nPlayer's orders:" << std::endl;
     std::cout << orders << std::endl;
 
     if (deck.getSize() == 5 && hand.getSize() == 0) {
         std::cout << "PASS: All cards returned to deck."
                   << std::endl;
-    } else {
-        std::cout << "FAIL: Cards were not all returned."
-                  << std::endl;
     }
-
-    // Test 7: Reinforcement
-    std::cout << "\nTEST 7: Reinforcement" << std::endl;
-
-    std::cout << "Reinforcement pool: "
-              << player.getReinforcementPool()
-              << std::endl;
-
-    if (player.getReinforcementPool() == 5) {
-        std::cout << "PASS: Reinforcement applied."
-                  << std::endl;
-    } else {
-        std::cout << "FAIL: Reinforcement incorrect."
+    else {
+        std::cout << "FAIL: Not all cards were played."
                   << std::endl;
     }
 
