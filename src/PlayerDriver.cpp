@@ -26,62 +26,75 @@ void testToAttack(Player* player, int playerNumber){
 
 void testCopyConstructor( Player* player1,  vector<Territory*> defendList, Map* gameMap){
      cout<<"====================TESTING COPY CONSTRUCTOR========================"<<endl;
+
+    //===DISPLAY PLAYER 1===
+
     //display list of player 1 territory
-    cout<<"Current PLAYER 1"<<endl;
-    cout<<"Territories to defend: "<<endl;
-    //create, store and display the list of territroies to defend
-    // vector<Territory*> defendList =player1->toDefend() ;
+    cout<<"+++Current PLAYER 1 +++"<<endl;
+    cout<<"+Territories to defend: +++"<<endl;
+
+    //display the list of territroies to defend
     for (int i = 0; i < defendList.size(); i++) {
         cout << defendList[i]->getName() << endl;
     }
+
     //set players name
     player1->setName("Bob");
+
     //display name
-    cout<<"Player 1 Name: "<< player1->getName()<<endl;
+    cout<<"+Player 1 Name: "<< player1->getName()<<endl;
 
-    cout<<"------Now we copy player 1 into new player 3------"<<endl;
 
+    //===COPY PLAYER 1===
+    cout<<endl<<"------Now we copy player 1 into new player 3------"<<endl;
     //create player 3 using copy constructor
     Player* player3 = new Player(*player1);
 
+
+    //===DISPLAY PLAYER 3===
     //display player 3 information
-    cout<<"Current PLAYER 3"<<endl;
-    cout<<"Territories to defend: "<<endl;
+    cout<<"+++Current PLAYER 3+++"<<endl;
+    cout<<"+Territories to defend: "<<endl;
     //create, store and display the list of territroies to defend
     vector<Territory*> defendList3 =player3->toDefend() ;
     for (int i = 0; i < defendList3.size(); i++) {
         cout << defendList3[i]->getName() << endl;
     }
     //display name
-    cout<<"Player 3 Name: "<< player3->getName()<<endl;
+    cout<<"+Player 3 Name: "<< player3->getName()<<endl;
 
-    //===change player 1 names
-    cout<<"------Now changing Player 1 name from Bob to Steve------"<<endl;
+    //===CHANGE PLAYER 1 NAME (using setName())
+    cout<<endl<<"------Now changing Player 1 name from Bob to Steve------"<<endl;
     player1->setName("Steve");
     cout<<"Player 1 name is " << player1->getName()<<endl;
     cout<<"Player 3 name is " << player3->getName()<<endl;
 
-
+    //===CHANGE PLAYER 1 and 3 TEERITORY LIST (using setTerritoryList())
     //===change player 3 territory list
-    cout<<endl<<"------Now changing Player 1 territory list adding new territories------"<<endl;
-     //put the territories 12-15 in player 1
-    for (int i = 12; i < 15; i++)
+    cout<<endl<<"------Now changing Player 3 territory list------"<<endl;
+
+    //make a new territory list to plug into setTerritoryList() for player 3
+    vector<Territory*> newTerritoryList;
+    for (int i = 15; i < 19; i++) //get some territories form the game map
     {
         Territory* t= gameMap->getTerritories()[i].get();
-        player1->addTerritory(t);
+        newTerritoryList.push_back(t); //add the new territories to the list
     }
+    //set the new territory list for player 3 and get the toDefend list
+    player3->setTerritoryList(newTerritoryList);
+    vector<Territory*> newDefendList3 = player3->toDefend();
 
-    cout<<"Player 1 New Territories to defend: "<<endl;
+    cout<<"+Player 1 New Territories to defend: "<<endl;
     //create, store and display the list of territroies to defend
     vector<Territory*> newDefendList =player1->toDefend() ;
     for (int i = 0; i < newDefendList.size(); i++) {
         cout << newDefendList[i]->getName() << endl;
     }
     
-    cout<<"Player 3 Territories to defend: "<<endl;
+    cout<<endl<<"+Player 3 Territories to defend: "<<endl;
     //create, store and display the list of territroies to defend
-    for (int i = 0; i < defendList3.size(); i++) {
-        cout << defendList3[i]->getName() << endl;
+    for (int i = 0; i < newDefendList3.size(); i++) {
+        cout << newDefendList3[i]->getName() << endl;
     }
     
 
