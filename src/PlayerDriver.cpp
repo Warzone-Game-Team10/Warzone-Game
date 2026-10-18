@@ -1,106 +1,154 @@
 #include <stdio.h>
 #include <iostream>
+#include <cmath> // Required for std::floor
 
 #include "Player.h"
 #include "Cards.h"
-#include "Order.h"
+#include "Orders.h"
 #include "Map.h"
 
 using namespace std;
 
-void testToDefend(Player* player, int playerNumber){
-    cout<<"===================PLAYER "<< playerNumber << ": list of teritories to defend========================"<<endl;
+void testSetTerritory(Map* gameMap, Player* player1){
+        //display before
+        cout<<"BEFORE-SetTerriotriesList"<<endl << *player1<<endl;        
+
+        //put the first 3% of the territories into player 1
+        int size= floor((gameMap->getTerritories().size())*0.3);
+        cout<<"Now putting the first " << size << " territories into player 1"<<endl<<endl;
+
+        //use setter for the territory list 
+        vector<Territory*> territoryList;
+        for (int i = 0; i < size; i++) //get some territories form the game map
+        {
+            Territory* t= gameMap->getTerritories()[i].get();
+            territoryList.push_back(t); //add the new territories to the list
+        }
+        //set the new territory list for player 3 and get the toDefend list
+        player1->setTerritoryList(territoryList);
+
+        //display after
+        cout<<"AFTER-SetTerriotriesList"<<endl << *player1<<endl;        
+    }
+
+void testSetCardHand(Player* player1){
+    //display before
+    cout<<"BEFORE-SetCardHand"<<endl << *player1<<endl;  
+    
+    //create deck and hand
+    Deck* deck = new Deck();  // shared by all players
+    Hand* hand = new Hand(deck);
+
+    cout<<"Now adding 2 cards" <<endl <<endl;
+    //add cards to the hand
+    hand->addCard(deck->draw());  // Hand takes ownership of the drawn card
+    hand->addCard(deck->draw());
+
+    //set the cards to player1
+    player1->setCardHand(hand);
+
+    //display after
+    cout<<"AFTER-SetCardHand"<<endl << *player1<<endl;  
+
+    delete deck;
+    delete hand;
+}    
+
+void testingSetOrder(Player* player1){
+    //display before
+    cout<<"BEFORE-SetOrder"<<endl << *player1<<endl;
+    
+    //create a order list to set the player to
+    cout<<"Now adding Deploy and Advance as a order"<<endl;
+    OrdersList* orderList = new OrdersList();
+    Order* order1 = new Deploy();
+    Order* order2 = new Advance();
+    orderList->addOrder(order1);
+    orderList->addOrder(order2);
+
+    //set the player to orderlist
+    player1->setOrdersList(orderList);
+
+    //display after
+    cout<<"AFTER-SetOrder"<<endl << *player1<<endl;   
+
+    delete orderList; //class orderList delete the order1 and order2 already
+}
+
+void testingIssueOrder(Player* player1){
+    //display before
+    cout<<"BEFORE- issueOrder"<<endl << *player1<<endl;  
+
+    cout<<"Now addind Bomb order and a Foo order" <<endl;
+    player1->issueOrder("Deploy");
+    player1->issueOrder("Foo");
+
+    //display after
+    cout<<"AFTER- issueOrder"<<endl << *player1<<endl;  
+}
+
+void testToDefend(Player* player){
     vector<Territory*> defendList1 =player->toDefend() ;
     for (int i = 0; i < defendList1.size(); i++) {
         cout << defendList1[i]->getName() << endl;
     }
 }
 
-void testToAttack(Player* player, int playerNumber){
-    cout<<"===================PLAYER "<< playerNumber << ": list of teritories to attack========================"<<endl;
+void testToAttack(Player* player){
     vector<Territory*> defendList1 =player->toAttack() ;
     for (int i = 0; i < defendList1.size(); i++) {
         cout << defendList1[i]->getName() << endl;
     }
 }
 
-void testCopyConstructor( Player* player1,  vector<Territory*> defendList, Map* gameMap){
-     cout<<"====================TESTING COPY CONSTRUCTOR========================"<<endl;
+void testCopyConstructor( Player* player1, Map* gameMap){
 
-    //===DISPLAY PLAYER 1===
-
-    //display list of player 1 territory
-    cout<<"+++Current PLAYER 1 +++"<<endl;
-    cout<<"+Territories to defend: +++"<<endl;
-
-    //display the list of territroies to defend
-    for (int i = 0; i < defendList.size(); i++) {
-        cout << defendList[i]->getName() << endl;
-    }
-
-    //set players name
-    player1->setName("Bob");
-
-    //display name
-    cout<<"+Player 1 Name: "<< player1->getName()<<endl;
-
+    //display player 1
+    cout<<*player1<<endl;
 
     //===COPY PLAYER 1===
-    cout<<endl<<"------Now we copy player 1 into new player 3------"<<endl;
+    cout<<endl<<"------Now we copy player 1 into new player 3------"<<endl<<endl;
     //create player 3 using copy constructor
     Player* player3 = new Player(*player1);
 
-
-    //===DISPLAY PLAYER 3===
-    //display player 3 information
-    cout<<"+++Current PLAYER 3+++"<<endl;
-    cout<<"+Territories to defend: "<<endl;
-    //create, store and display the list of territroies to defend
-    vector<Territory*> defendList3 =player3->toDefend() ;
-    for (int i = 0; i < defendList3.size(); i++) {
-        cout << defendList3[i]->getName() << endl;
-    }
-    //display name
-    cout<<"+Player 3 Name: "<< player3->getName()<<endl;
+    //display player 3
+    cout<<*player3<<endl;
 
     //===CHANGE PLAYER 1 NAME (using setName())
-    cout<<endl<<"------Now changing Player 1 name from Bob to Steve------"<<endl;
+    cout<<endl<<"------Now changing Player 1 name from to Steve------"<<endl;
     player1->setName("Steve");
-    cout<<"Player 1 name is " << player1->getName()<<endl;
-    cout<<"Player 3 name is " << player3->getName()<<endl;
 
-    //===CHANGE PLAYER 1 and 3 TEERITORY LIST (using setTerritoryList())
+    //===CHANGE PLAYER 1 and 3 TERITORY LIST (using setTerritoryList())
     //===change player 3 territory list
-    cout<<endl<<"------Now changing Player 3 territory list------"<<endl;
+    cout<<"------Now changing Player 1 territory list------"<<endl;
 
-    //make a new territory list to plug into setTerritoryList() for player 3
-    vector<Territory*> newTerritoryList;
-    for (int i = 15; i < 19; i++) //get some territories form the game map
+    //put the first 3% of the territories into player 3 starting form the middle of the list
+    int size= floor((gameMap->getTerritories().size())*0.3);
+    int middle_point= floor(size/2);
+    cout<<"------Now putting the first " << size << " territories into player 1, starting form index "<<middle_point<<"------"<<endl;
+
+    //use setter for the territory list 
+    vector<Territory*> territoryList;
+    for (int i = middle_point; i < (size + middle_point); i++) //get some territories form the game map
     {
         Territory* t= gameMap->getTerritories()[i].get();
-        newTerritoryList.push_back(t); //add the new territories to the list
+        territoryList.push_back(t); //add the new territories to the list
     }
     //set the new territory list for player 3 and get the toDefend list
-    player3->setTerritoryList(newTerritoryList);
-    vector<Territory*> newDefendList3 = player3->toDefend();
+    player1->setTerritoryList(territoryList);
 
-    cout<<"+Player 1 New Territories to defend: "<<endl;
-    //create, store and display the list of territroies to defend
-    vector<Territory*> newDefendList =player1->toDefend() ;
-    for (int i = 0; i < newDefendList.size(); i++) {
-        cout << newDefendList[i]->getName() << endl;
-    }
-    
-    cout<<endl<<"+Player 3 Territories to defend: "<<endl;
-    //create, store and display the list of territroies to defend
-    for (int i = 0; i < newDefendList3.size(); i++) {
-        cout << newDefendList3[i]->getName() << endl;
-    }
+    cout<<"------Now adding Player 1 a new order (BOMB)------"<<endl;
+    player1->issueOrder("Bomb");
+
+    cout<<"------Transformation is done. Here are the new results------"<<endl<<endl;
+    cout<<*player1<<endl;
+    cout<<*player3<<endl;
     
 
     //delete
      delete player3;
 }
+
 
 
 int main(){
@@ -116,52 +164,39 @@ int main(){
         delete loader;
         return 1;
     }
-    delete loader;
     
-    //=====create 2 players=====
+    
+    //=====create players=====
     Player* player1= new Player();
-    Player* player2= new Player();
+    //give player a name
+    player1->setName("Jane Doe");
 
-    //====Distribute Territories to two players====
-    int size= gameMap->getTerritories().size();
+    cout<<endl<<"==============================[TESTING: SET TERRITORY]================================================="<<endl;
+    testSetTerritory(gameMap, player1);
 
-    //put the territories 1-5 in player 1
-    for (int i = 0; i < 5; i++)
-    {
-        Territory* t= gameMap->getTerritories()[i].get();
-        player1->addTerritory(t);
-    }
+    cout<<endl<<"==============================[TESTING: SET CARD]================================================="<<endl;
+    testSetCardHand(player1);
 
-    //put the territories 6-10 in player 2
-    for (int i = 5; i < 10; i++)
-    {
-        Territory* t= gameMap->getTerritories()[i].get();
-        player2->addTerritory(t);
-    }
-
+    cout<<endl<<"==============================[TESTING: SET ORDER]================================================="<<endl;
+    testingSetOrder(player1);
     
+    cout<<endl<<"==============================[TESTING: ISSUE ORDER]================================================="<<endl;
+    testingIssueOrder(player1);
 
-    //======TESTING====
-    testToDefend(player1,1);
-    testToAttack(player1,1);
+    cout<<endl<<"==============================[TESTING: TO DEFEND]================================================="<<endl;
+    testToDefend(player1);
+
+    cout<<endl<<"==============================[TESTING: TO ATTACK]================================================="<<endl;
+    testToAttack(player1);
     
-    testToDefend(player2,2);
-    testToAttack(player2,2);
+    cout<<endl<<"==============================[TESTING: COPY CONTRACTOR]================================================="<<endl;
+    testCopyConstructor(player1, gameMap);    
 
-    vector<Territory*> defendList1 =player1->toDefend() ;
-    for (int i = 0; i < defendList1.size(); i++) {
-        cout << defendList1[i]->getName() << endl;
-    }
-   
-    testCopyConstructor(player1, defendList1, gameMap);    
-
-   
-
-
+    cout<<endl<<"==============================[TESTING IS OVER. THANK YOU!]================================================="<<endl;
 
     //delete to prevent memory leaks
+    delete loader;
     delete player1;
-    delete player2;
     delete gameMap;//because loadMap returns a smart pointer we need to delete even if the "new" key word is not used
 
     return 1;

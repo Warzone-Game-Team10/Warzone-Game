@@ -4,7 +4,7 @@
 #include <string>
 
 #include "Cards.h"
-#include "Order.h"
+#include "Orders.h"
 #include "Map.h"
 
 using namespace std;
@@ -14,14 +14,14 @@ class Player {
     private:
         string name;
         vector<Territory*> territoryList;
-        Cards* cardHand;
+        Hand* cardHand;
         OrdersList* ordersList; 
 
     public:
     //==========BASIC FUNCTION==================
         //constructors
         Player();
-        Player(string name, Cards* cardHand, OrdersList* ordersList, vector<Territory*> territoryList);
+        Player(string name, Hand* cardHand, OrdersList* ordersList, vector<Territory*> territoryList);
          // copy constructor
         Player(const Player& p);     
         // assignment operator             
@@ -43,18 +43,18 @@ class Player {
         //returns a list of territories that are to be attacked.
         vector<Territory*> toAttack();
         //creates an Order object and puts it in the player's list of orders
-        void issueOrder();
+        void issueOrder(string orderType);
 
     //==========GETTER FUNCTION==================
         string getName();
         vector<Territory*> getTerritoryList();
-        Cards* getCardHand();
+        Hand* getCardHand();
         OrdersList* getOrdersList();
 
     //==========SETTER FUNCTION==================
         void setName(string name);
         void setTerritoryList(vector<Territory*> territoryList);
-        void setCardHand(Cards* cardHand);
+        void setCardHand(Hand* cardHand);
         void setOrdersList(OrdersList* ordersList);
      
     //=====To String======== 

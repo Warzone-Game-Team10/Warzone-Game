@@ -5,7 +5,7 @@
 
 #include "Player.h"
 #include "Cards.h"
-#include "Order.h"
+#include "Orders.h"
 #include "Map.h"
 
 
@@ -14,13 +14,27 @@ using namespace std;
 //==========BASIC FUNCTION==================
 //constructor
 Player::Player()
-    : name("Unnamed"), territoryList(), cardHand(new Cards()), ordersList(new OrdersList()) {}
+    : name("Unnamed"), territoryList(), cardHand(new Hand(nullptr)), ordersList(new OrdersList()) {}
 
- Player::Player(string name, Cards* cardHand, OrdersList* ordersList, vector<Territory*> territoryList){
+
+ Player::Player(string playerName, Hand* cardHand, OrdersList* ordersList, vector<Territory*> territoryList)
+ : name(playerName), cardHand(nullptr), territoryList(), ordersList(nullptr) {
     
-    this->name=name;
-    this->cardHand=new Cards();
-    this->ordersList = new OrdersList();
+    this->name=playerName;
+  
+    //Hand
+    if (ordersList != nullptr) {
+        this->cardHand = new Hand(*cardHand);
+    } else {
+        this->cardHand = new Hand(nullptr);
+    }
+    
+    //Order
+    if (ordersList != nullptr) {
+        this->ordersList = new OrdersList(*ordersList);
+    } else {
+        this->ordersList = new OrdersList();
+    }
 
     //addTerritories to the List
     int count = territoryList.size();
@@ -64,7 +78,7 @@ Player& Player::operator=(const Player& other) {
         }
     }
 
-    //return the current ("this") object as a pointer ?
+    //return the current ("this") 
     return *this; 
 }
 
@@ -75,7 +89,7 @@ Player::~Player(){
     deleteAllTerritories();
 }
 
-// =========HELPER
+// =========HELPER functions =======
 
 // Deletes every Territory object in player's list, then empties the list. Used by the destructor and by operator=.
 void Player::deleteAllTerritories() {
@@ -138,12 +152,12 @@ vector<Territory*> Player::toAttack(){
                 continue;
             }
  
-            // Check if player already own the territory is yes the skip
+            // Check if player already own the territory is yes then skip
             if (ownsTerritory(candidate)) {
                 continue;   
             }
  
-            // check if territory is already in the list of results. if yes then don't read else add to the list result
+            // check if territory is already in the list of results. if yes then don't add else add to the list result
             bool alreadyListed = false;
             int resultCount = result.size();
             for (int k = 0; k < resultCount; k++) {
@@ -162,10 +176,27 @@ vector<Territory*> Player::toAttack(){
 }
 
 //creates an Order object and puts it in the player's list of orders
-void Player::issueOrder(){
-    Order* order =new Order();
-    ordersList->add(order);
-    cout<< "===a new order was added: ===" << endl;
+void Player::issueOrder(string orderType){
+    Order* newOrder = nullptr;      // will point at whichever order we build
+
+    if (orderType == "Deploy") {
+        newOrder = new Deploy();
+    } else if (orderType == "Advance") {
+        newOrder = new Advance();
+    } else if (orderType == "Bomb") {
+        newOrder = new Bomb();
+    } else if (orderType == "Blockade") {
+        newOrder = new Blockade();
+    } else if (orderType == "Airlift") {
+        newOrder = new Airlift();
+    } else if (orderType == "Negotiate") {
+        newOrder = new Negotiate();
+    } else {
+        cout << "Unknown order type: " << orderType << endl;
+        return;  // build nothing, add nothing
+    }
+
+    ordersList->addOrder(newOrder); // the list now OWNS this order
 }
 
 
@@ -205,17 +236,38 @@ void Player::setTerritoryList(vector<Territory*> newTerritories) {
         delete oldTerritories[i];
     }
 }
-void Player::setCardHand(Cards* cardHand){
-    this->cardHand = cardHand;
+void Player::setCardHand(Hand* newCardHand){
+    if (newCardHand == nullptr || newCardHand == cardHand) {
+        return;                                  // ignore bad input or "set to itself"
+    }
+    Hand* oldCardHand = cardHand;          // remember the old list
+    cardHand = new Hand(*newCardHand);     // deep copy FIRST (a separate list)
+    delete oldCardHand;                            // then free the old one
 };
-void Player::setOrdersList(OrdersList* ordersList){
-    this->ordersList = ordersList;
+void Player::setOrdersList(OrdersList* newOrders){
+    if (newOrders == nullptr || newOrders == ordersList) {
+        return;                                  // ignore bad input or "set to itself"
+    }
+    OrdersList* oldOrders = ordersList;          // remember the old list
+    ordersList = new OrdersList(*newOrders);     // deep copy FIRST (a separate list)
+    delete oldOrders;                            // then free the old one
 };                
 
 //======String
-std::ostream& operator<<(std::ostream& out, const Player& p) {
-    out << "Player " << p.name
-        << " [territories size: " << p.territoryList.size()
-         << "]";
+ostream& operator<<(ostream& out, const Player& p) {
+    out << "===== Player " << p.name << " =====" << endl
+
+        << "Territories (" << p.territoryList.size() << "):" <<endl;
+    
+    //print out territories
+    int count = p.territoryList.size();
+    for (int i = 0; i < count; i++) {
+        out <<i<<") "<<p.territoryList[i]->getName()<<endl;
+    }
+
+    //print out Cards
+    out << "Cards: " << *(p.cardHand) << endl;
+    //print out orders
+    out << "Orders:" << endl << *(p.ordersList) << endl;
     return out;
 }
