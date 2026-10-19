@@ -11,11 +11,18 @@ using namespace std;
 
 void testSetTerritory(Map* gameMap, Player* player1){
         //display before
-        cout<<"BEFORE-SetTerriotriesList"<<endl << *player1<<endl;        
+        cout<<"BEFORE-SetTerriotriesList"<<endl;
+        //Use GET FUNCTION to print out
+        vector<Territory*> oldTerritories = player1->getTerritoryList();
+        int count = oldTerritories.size();
+        cout << "Territories (" << count << "):" << endl;
+        for (int i = 0; i < count; i++) {
+            cout << "   " << oldTerritories[i]->getName() << endl;
+        }       
 
         //put the first 3% of the territories into player 1
         int size= floor((gameMap->getTerritories().size())*0.3);
-        cout<<"Now putting the first " << size << " territories into player 1"<<endl<<endl;
+        cout<<endl<<"Now putting the first " << size << " territories into player 1"<<endl<<endl;
 
         //use setter for the territory list 
         vector<Territory*> territoryList;
@@ -28,18 +35,27 @@ void testSetTerritory(Map* gameMap, Player* player1){
         player1->setTerritoryList(territoryList);
 
         //display after
-        cout<<"AFTER-SetTerriotriesList"<<endl << *player1<<endl;        
+        cout<<"AFTER-SetTerriotriesList"<<endl;
+        //Use GET FUNCTION to print out
+        vector<Territory*> newTerritories = player1->getTerritoryList();
+        count = newTerritories.size();
+        cout << "Territories (" << count << "):" << endl;
+        for (int i = 0; i < count; i++) {
+            cout << "   " << newTerritories[i]->getName() << endl;
+        }         
     }
 
 void testSetCardHand(Player* player1){
     //display before
-    cout<<"BEFORE-SetCardHand"<<endl << *player1<<endl;  
+    cout<<"BEFORE-SetCardHand"<<endl; 
+    //Use GET FUNCTION to print out
+    cout<< *(player1->getCardHand()) <<endl;
     
     //create deck and hand
     Deck* deck = new Deck();  // shared by all players
     Hand* hand = new Hand(deck);
 
-    cout<<"Now adding 2 cards" <<endl <<endl;
+    cout<<endl<<"Now adding 2 cards..." <<endl <<endl;
     //add cards to the hand
     hand->addCard(deck->draw());  // Hand takes ownership of the drawn card
     hand->addCard(deck->draw());
@@ -48,7 +64,9 @@ void testSetCardHand(Player* player1){
     player1->setCardHand(hand);
 
     //display after
-    cout<<"AFTER-SetCardHand"<<endl << *player1<<endl;  
+    cout<<"AFTER-SetCardHand"<<endl;  
+    //Use GET FUNCTION to print out
+    cout<< *(player1->getCardHand()) <<endl;
 
     delete deck;
     delete hand;
@@ -56,10 +74,12 @@ void testSetCardHand(Player* player1){
 
 void testingSetOrder(Player* player1){
     //display before
-    cout<<"BEFORE-SetOrder"<<endl << *player1<<endl;
+    cout<<"BEFORE-SetOrder"<<endl;
+    //Use GET FUNCTION to print out
+    cout<< *(player1->getOrdersList()) <<endl;
     
     //create a order list to set the player to
-    cout<<"Now adding Deploy and Advance as a order"<<endl;
+    cout<<endl<<"Now adding Deploy and Advance as a order"<<endl<<endl;
     OrdersList* orderList = new OrdersList();
     Order* order1 = new Deploy();
     Order* order2 = new Advance();
@@ -70,7 +90,9 @@ void testingSetOrder(Player* player1){
     player1->setOrdersList(orderList);
 
     //display after
-    cout<<"AFTER-SetOrder"<<endl << *player1<<endl;   
+    cout<<"AFTER-SetOrder"<<endl;
+    //Use GET FUNCTION to print out
+    cout<< *(player1->getOrdersList()) <<endl;   
 
     delete orderList; //class orderList delete the order1 and order2 already
 }
@@ -79,12 +101,12 @@ void testingIssueOrder(Player* player1){
     //display before
     cout<<"BEFORE- issueOrder"<<endl << *player1<<endl;  
 
-    cout<<"Now addind Bomb order and a Foo order" <<endl;
+    cout<<"Now adding Bomb order and a Foo order" <<endl<<endl;
     player1->issueOrder("Deploy");
     player1->issueOrder("Foo");
 
     //display after
-    cout<<"AFTER- issueOrder"<<endl << *player1<<endl;  
+    cout<<endl<<"AFTER- issueOrder"<<endl << *player1<<endl;  
 }
 
 void testToDefend(Player* player){
@@ -192,7 +214,12 @@ int main(){
     cout<<endl<<"==============================[TESTING: COPY CONTRACTOR]================================================="<<endl;
     testCopyConstructor(player1, gameMap);    
 
-    cout<<endl<<"==============================[TESTING IS OVER. THANK YOU!]================================================="<<endl;
+    cout<<endl<<"==============================[TESTING IS OVER. THANK YOU!]================================================="<<endl<<endl;
+
+    
+    
+    
+
 
     //delete to prevent memory leaks
     delete loader;
