@@ -106,7 +106,7 @@ void Player::addTerritory(Territory* territory) {
         return;   // ignore bad input instead to avoid crashing later
     }
     if (ownsTerritory(territory)) {
-        return;   // if playe already have this country return
+        return;   // if player already have this country return
     }
     
     Territory* copy = new Territory(*territory);   // DEEP COPY
@@ -118,6 +118,7 @@ void Player::addTerritory(Territory* territory) {
 bool Player::ownsTerritory(Territory* territory) {
     int count = territoryList.size();
     for (int i = 0; i < count; i++) {
+        //if Ids match thenthe player already owns it
         if (territoryList[i]->getId() == territory->getId()) {
             return true;
         }
@@ -141,7 +142,7 @@ vector<Territory*> Player::toAttack(){
         //Look at each territory I own and see its neighbours with getAdjacentTerritories() from map file.
         std::vector<Territory*> neighbours = territoryList[i]->getAdjacentTerritories();
  
-        //check if the neighbours are not repeasting or part of the territory list
+        //check if the neighbours are not repeasting or part of the territory list already
         int neighbourCount = neighbours.size();
         for (int j = 0; j < neighbourCount; j++) {
             Territory* candidate = neighbours[j];
@@ -260,6 +261,7 @@ void Player::setOrdersList(OrdersList* newOrders){
 
 //======Like the toString
 ostream& operator<<(ostream& out, const Player& p) {
+    //print out name
     out << "===== Player " << p.name << " =====" << endl
 
         << "Territories (" << p.territoryList.size() << "):" <<endl;

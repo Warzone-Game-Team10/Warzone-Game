@@ -110,6 +110,7 @@ void testingIssueOrder(Player* player1){
 }
 
 void testToDefend(Player* player){
+    //get list using toDefend() and display the list of territories
     vector<Territory*> defendList1 =player->toDefend() ;
     for (int i = 0; i < defendList1.size(); i++) {
         cout << defendList1[i]->getName() << endl;
@@ -117,6 +118,7 @@ void testToDefend(Player* player){
 }
 
 void testToAttack(Player* player){
+    //get list using toAttack() and display the list of territories
     vector<Territory*> defendList1 =player->toAttack() ;
     for (int i = 0; i < defendList1.size(); i++) {
         cout << defendList1[i]->getName() << endl;
@@ -140,8 +142,7 @@ void testCopyConstructor( Player* player1, Map* gameMap){
     cout<<endl<<"------Now changing Player 1 name from to Steve------"<<endl;
     player1->setName("Steve");
 
-    //===CHANGE PLAYER 1 and 3 TERITORY LIST (using setTerritoryList())
-    //===change player 3 territory list
+    //===CHANGE PLAYER 1's territory list  
     cout<<"------Now changing Player 1 territory list------"<<endl;
 
     //put the first 3% of the territories into player 3 starting form the middle of the list
@@ -149,7 +150,7 @@ void testCopyConstructor( Player* player1, Map* gameMap){
     int middle_point= floor(size/2);
     cout<<"------Now putting the first " << size << " territories into player 1, starting form index "<<middle_point<<"------"<<endl;
 
-    //use setter for the territory list 
+    //create territorylist to set the player1 to
     vector<Territory*> territoryList;
     for (int i = middle_point; i < (size + middle_point); i++) //get some territories form the game map
     {
@@ -159,9 +160,15 @@ void testCopyConstructor( Player* player1, Map* gameMap){
     //set the new territory list for player 3 and get the toDefend list
     player1->setTerritoryList(territoryList);
 
+    //===CHANGING PLAYER 1 adding 1 order
     cout<<"------Now adding Player 1 a new order (BOMB)------"<<endl;
     player1->issueOrder("Bomb");
 
+    //===CHANGING PLAYER 1 adding 2 cards
+    cout<<"------Now giving 2 cards to Player 1------"<<endl;
+    testSetCardHand(player1);
+
+    //display results
     cout<<"------Transformation is done. Here are the new results------"<<endl<<endl;
     cout<<*player1<<endl;
     cout<<*player3<<endl;
@@ -198,6 +205,9 @@ int main(){
 
     cout<<endl<<"==============================[TESTING: SET CARD]================================================="<<endl;
     testSetCardHand(player1);
+    //make player 1 play all their cards.
+    cout<<endl<<endl<<"----Make player 1 play all their cards---"<<endl;
+    player1->getCardHand()->playAll(player1);
 
     cout<<endl<<"==============================[TESTING: SET ORDER]================================================="<<endl;
     testingSetOrder(player1);
@@ -215,11 +225,6 @@ int main(){
     testCopyConstructor(player1, gameMap);    
 
     cout<<endl<<"==============================[TESTING IS OVER. THANK YOU!]================================================="<<endl<<endl;
-
-    
-    
-    
-
 
     //delete to prevent memory leaks
     delete loader;
