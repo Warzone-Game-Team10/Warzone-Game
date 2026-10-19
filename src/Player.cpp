@@ -16,14 +16,13 @@ using namespace std;
 Player::Player()
     : name("Unnamed"), territoryList(), cardHand(new Hand(nullptr)), ordersList(new OrdersList()) {}
 
-
  Player::Player(string playerName, Hand* cardHand, OrdersList* ordersList, vector<Territory*> territoryList)
  : name(playerName), cardHand(nullptr), territoryList(), ordersList(nullptr) {
     
     this->name=playerName;
   
     //Hand
-    if (ordersList != nullptr) {
+    if (cardHand != nullptr) {
         this->cardHand = new Hand(*cardHand);
     } else {
         this->cardHand = new Hand(nullptr);
@@ -42,12 +41,12 @@ Player::Player()
         addTerritory(territoryList[i]);
     }
     
-}
+} 
 
 //copy constructor (deep copy)
 Player::Player(const Player& p){
     this->name= p.name;
-    this->cardHand = new Cards(*(p.cardHand));
+    this->cardHand = new Hand(*(p.cardHand));
     this->ordersList = new OrdersList(*(p.ordersList));
 
      // deep copy of each territory
@@ -68,7 +67,7 @@ Player& Player::operator=(const Player& other) {
  
         // Step 2: deep copy from the other player.
         name = other.name;
-        cardHand = new Cards(*(other.cardHand));
+        cardHand = new Hand(*(other.cardHand));
         ordersList = new OrdersList(*(other.ordersList));
         
         //deep copy territories
@@ -204,12 +203,15 @@ void Player::issueOrder(string orderType){
 string Player::getName(){
     return name;
 };
+
 vector<Territory*> Player::getTerritoryList(){
     return territoryList;
 };
-Cards* Player::getCardHand(){
+
+Hand* Player::getCardHand(){
     return cardHand;
 };
+
 OrdersList* Player::getOrdersList(){
     return ordersList;
 };
@@ -218,6 +220,7 @@ OrdersList* Player::getOrdersList(){
 void Player::setName(string name){
     this->name = name;
 };
+
 void Player::setTerritoryList(vector<Territory*> newTerritories) {
     
     //Remember the old territories, then empty our list.
@@ -236,6 +239,7 @@ void Player::setTerritoryList(vector<Territory*> newTerritories) {
         delete oldTerritories[i];
     }
 }
+
 void Player::setCardHand(Hand* newCardHand){
     if (newCardHand == nullptr || newCardHand == cardHand) {
         return;                                  // ignore bad input or "set to itself"
@@ -244,6 +248,7 @@ void Player::setCardHand(Hand* newCardHand){
     cardHand = new Hand(*newCardHand);     // deep copy FIRST (a separate list)
     delete oldCardHand;                            // then free the old one
 };
+
 void Player::setOrdersList(OrdersList* newOrders){
     if (newOrders == nullptr || newOrders == ordersList) {
         return;                                  // ignore bad input or "set to itself"
@@ -253,7 +258,7 @@ void Player::setOrdersList(OrdersList* newOrders){
     delete oldOrders;                            // then free the old one
 };                
 
-//======String
+//======Like the toString
 ostream& operator<<(ostream& out, const Player& p) {
     out << "===== Player " << p.name << " =====" << endl
 
@@ -267,6 +272,7 @@ ostream& operator<<(ostream& out, const Player& p) {
 
     //print out Cards
     out << "Cards: " << *(p.cardHand) << endl;
+
     //print out orders
     out << "Orders:" << endl << *(p.ordersList) << endl;
     return out;
