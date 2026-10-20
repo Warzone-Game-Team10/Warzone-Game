@@ -58,7 +58,6 @@ class Player {
         void setOrdersList(OrdersList* ordersList);
      
     //=====To String======== 
-    // Printing:   std::cout << somePlayer;   (like overriding toString()).
     friend ostream& operator<<(ostream& out, const Player& player);
 };
 
