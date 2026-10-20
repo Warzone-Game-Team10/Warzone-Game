@@ -48,7 +48,7 @@ void testSetTerritory(Map* gameMap, Player* player1){
 void testSetCardHand(Player* player1, Deck* deck){
     //display before
     cout<<"BEFORE-SetCardHand"<<endl; 
-    //Use GET FUNCTION to print out
+    //Use GET FUNCTION and dereferencing to print out
     cout<< *(player1->getCardHand()) <<endl;
     
     //create hand using the deck made in main()
@@ -64,7 +64,7 @@ void testSetCardHand(Player* player1, Deck* deck){
 
     //display after
     cout<<"AFTER-SetCardHand"<<endl;  
-    //Use GET FUNCTION to print out
+    //Use GET FUNCTION and dereferencing to print out
     cout<< *(player1->getCardHand()) <<endl;
 
     delete hand;
@@ -73,14 +73,17 @@ void testSetCardHand(Player* player1, Deck* deck){
 void testingSetOrder(Player* player1){
     //display before
     cout<<"BEFORE-SetOrder"<<endl;
-    //Use GET FUNCTION to print out
+    //Use GET FUNCTION and dereferencing to print out
     cout<< *(player1->getOrdersList()) <<endl;
     
     //create a order list to set the player to
     cout<<endl<<"Now adding Deploy and Advance as a order"<<endl<<endl;
     OrdersList* orderList = new OrdersList();
+
+    //create the orders
     Order* order1 = new Deploy();
     Order* order2 = new Advance();
+    //add order to the list
     orderList->addOrder(order1);
     orderList->addOrder(order2);
 
@@ -89,21 +92,22 @@ void testingSetOrder(Player* player1){
 
     //display after
     cout<<"AFTER-SetOrder"<<endl;
-    //Use GET FUNCTION to print out
+    //Use GET FUNCTION and dereferencing to print out
     cout<< *(player1->getOrdersList()) <<endl;   
 
     delete orderList; //class orderList delete the order1 and order2 already
 }
 
 void testingIssueOrder(Player* player1){
-    //display before
+    //display before and dereferencing
     cout<<"BEFORE- issueOrder"<<endl << *player1<<endl;  
 
+    //issue one correct order and one bad order for testing
     cout<<"Now adding Bomb order and a Foo order" <<endl<<endl;
     player1->issueOrder("Deploy");
     player1->issueOrder("Foo");
 
-    //display after
+    //display after and dereferencing
     cout<<endl<<"AFTER- issueOrder"<<endl << *player1<<endl;  
 }
 
@@ -125,7 +129,7 @@ void testToAttack(Player* player){
 
 void testCopyConstructor( Player* player1, Map* gameMap, Deck* deck){
 
-    //display player 1
+    //display and dereferencing player 1 
     cout<<*player1<<endl;
 
     //===COPY PLAYER 1===
@@ -133,7 +137,7 @@ void testCopyConstructor( Player* player1, Map* gameMap, Deck* deck){
     //create player 3 using copy constructor
     Player* player3 = new Player(*player1);
 
-    //display player 3
+    //display and dereferencing player 3
     cout<<*player3<<endl;
 
     //===CHANGE PLAYER 1 NAME (using setName())
@@ -163,11 +167,11 @@ void testCopyConstructor( Player* player1, Map* gameMap, Deck* deck){
     player1->issueOrder("Bomb");
 
     //===CHANGING PLAYER 1 adding 2 cards
-    cout<<"------Now giving 2 cards to Player 1------"<<endl;
+    cout<<"------Now giving 2 cards to Player 1------"<<endl<<endl;
     testSetCardHand(player1,deck);
 
-    //display results
-    cout<<"------Transformation is done. Here are the new results------"<<endl<<endl;
+    //display and dereferencing results
+    cout<<endl<<"------Transformation is done. Here are the new results------"<<endl<<endl;
     cout<<*player1<<endl;
     cout<<*player3<<endl;
     
@@ -202,6 +206,7 @@ int main(){
     testSetTerritory(gameMap, player1);
 
     cout<<endl<<"==============================[TESTING: SET CARD]================================================="<<endl;
+    //create desk so we can use it for hands
     Deck* deck = new Deck();
     testSetCardHand(player1, deck);
     //make player 1 play all their cards.

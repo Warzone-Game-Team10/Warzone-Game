@@ -201,6 +201,7 @@ void Player::issueOrder(string orderType){
 
 
 //=======GETTER
+//most of these getter returns a point, so make sure to dereferencing it with * to gives the object at that address its pointing at
 string Player::getName(){
     return name;
 };
@@ -273,6 +274,7 @@ ostream& operator<<(ostream& out, const Player& p) {
     }
 
     //print out Cards
+    //p.cardHand returns a point and dereferencing it with * to gives the object at that address its pointing at
     out << "Cards: " << *(p.cardHand) << endl;
 
     //print out orders
