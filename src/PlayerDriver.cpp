@@ -45,14 +45,13 @@ void testSetTerritory(Map* gameMap, Player* player1){
         }         
     }
 
-void testSetCardHand(Player* player1){
+void testSetCardHand(Player* player1, Deck* deck){
     //display before
     cout<<"BEFORE-SetCardHand"<<endl; 
     //Use GET FUNCTION to print out
     cout<< *(player1->getCardHand()) <<endl;
     
-    //create deck and hand
-    Deck* deck = new Deck();  // shared by all players
+    //create hand using the deck made in main()
     Hand* hand = new Hand(deck);
 
     cout<<endl<<"Now adding 2 cards..." <<endl <<endl;
@@ -68,7 +67,6 @@ void testSetCardHand(Player* player1){
     //Use GET FUNCTION to print out
     cout<< *(player1->getCardHand()) <<endl;
 
-    delete deck;
     delete hand;
 }    
 
@@ -125,7 +123,7 @@ void testToAttack(Player* player){
     }
 }
 
-void testCopyConstructor( Player* player1, Map* gameMap){
+void testCopyConstructor( Player* player1, Map* gameMap, Deck* deck){
 
     //display player 1
     cout<<*player1<<endl;
@@ -166,7 +164,7 @@ void testCopyConstructor( Player* player1, Map* gameMap){
 
     //===CHANGING PLAYER 1 adding 2 cards
     cout<<"------Now giving 2 cards to Player 1------"<<endl;
-    testSetCardHand(player1);
+    testSetCardHand(player1,deck);
 
     //display results
     cout<<"------Transformation is done. Here are the new results------"<<endl<<endl;
@@ -204,7 +202,8 @@ int main(){
     testSetTerritory(gameMap, player1);
 
     cout<<endl<<"==============================[TESTING: SET CARD]================================================="<<endl;
-    testSetCardHand(player1);
+    Deck* deck = new Deck();
+    testSetCardHand(player1, deck);
     //make player 1 play all their cards.
     cout<<endl<<endl<<"----Make player 1 play all their cards---"<<endl;
     player1->getCardHand()->playAll(player1);
@@ -222,14 +221,14 @@ int main(){
     testToAttack(player1);
     
     cout<<endl<<"==============================[TESTING: COPY CONTRACTOR]================================================="<<endl;
-    testCopyConstructor(player1, gameMap);    
+    testCopyConstructor(player1, gameMap, deck);    
 
     cout<<endl<<"==============================[TESTING IS OVER. THANK YOU!]================================================="<<endl<<endl;
 
     //delete to prevent memory leaks
     delete loader;
     delete player1;
+    delete deck;
     delete gameMap;//because loadMap returns a smart pointer we need to delete even if the "new" key word is not used
-
     return 1;
 }
