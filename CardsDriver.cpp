@@ -11,20 +11,21 @@ int main() {
               << std::endl;
 
     Deck deck;
-    Hand hand(&deck);
-    OrdersList orders;
     Player player;
 
+    Hand hand(&deck);
     player.setCardHand(&hand);
-    player.setOrdersList(&orders);
 
-    // Test 1: Initial deck and hand
+    // Use the Player's actual Hand.
+    Hand* playerHand = player.getCardHand();
+
+    // TEST 1: Initial state
     std::cout << "\nTEST 1: Initial state" << std::endl;
 
     std::cout << deck << std::endl;
-    std::cout << hand << std::endl;
+    std::cout << *playerHand << std::endl;
 
-    // Test 2: Draw every card
+    // TEST 2: Draw all five cards
     std::cout << "\nTEST 2: Drawing cards" << std::endl;
 
     for (int i = 0; i < 5; i++) {
@@ -32,65 +33,63 @@ int main() {
 
         if (card != nullptr) {
             std::cout << "Drew: " << *card << std::endl;
-            hand.addCard(card);
+            playerHand->addCard(card);
         }
     }
 
     std::cout << deck << std::endl;
-    std::cout << hand << std::endl;
+    std::cout << *playerHand << std::endl;
 
-    if (deck.getSize() == 0 && hand.getSize() == 5) {
+    if (deck.getSize() == 0 && playerHand->getSize() == 5) {
         std::cout << "PASS: All cards drawn." << std::endl;
     }
     else {
         std::cout << "FAIL: Drawing cards." << std::endl;
     }
 
-    // Test 3: Drawing from an empty deck
+    // TEST 3: Empty Deck
     std::cout << "\nTEST 3: Empty deck" << std::endl;
 
     Card* extraCard = deck.draw();
 
     if (extraCard == nullptr) {
-        std::cout << "PASS: Empty deck handled."
-                  << std::endl;
+        std::cout << "PASS: Empty deck handled." << std::endl;
     }
     else {
-        std::cout << "FAIL: Expected nullptr."
-                  << std::endl;
-        hand.addCard(extraCard);
+        std::cout << "FAIL: Expected nullptr." << std::endl;
+        playerHand->addCard(extraCard);
     }
 
-    // Test 4: Copy constructor
+    // TEST 4: Copy constructor
     std::cout << "\nTEST 4: Copy constructor" << std::endl;
 
-    Hand copiedHand(hand);
+    Hand copiedHand(*playerHand);
 
-    std::cout << "Original: " << hand << std::endl;
+    std::cout << "Original: " << *playerHand << std::endl;
     std::cout << "Copy: " << copiedHand << std::endl;
 
-    // Test 5: Assignment operator
+    // TEST 5: Assignment operator
     std::cout << "\nTEST 5: Assignment operator" << std::endl;
 
     Hand assignedHand(&deck);
-    assignedHand = hand;
+    assignedHand = *playerHand;
 
     std::cout << "Assigned: "
               << assignedHand << std::endl;
 
-    // Test 6: Play all cards
+    // TEST 6: Play all cards
     std::cout << "\nTEST 6: Playing cards" << std::endl;
 
-    hand.playAll(&player);
+    playerHand->playAll(&player);
 
     std::cout << "\nAfter playing:" << std::endl;
     std::cout << deck << std::endl;
-    std::cout << hand << std::endl;
+    std::cout << *playerHand << std::endl;
 
     std::cout << "\nPlayer's orders:" << std::endl;
-    std::cout << orders << std::endl;
+    std::cout << *player.getOrdersList() << std::endl;
 
-    if (deck.getSize() == 5 && hand.getSize() == 0) {
+    if (deck.getSize() == 5 && playerHand->getSize() == 0) {
         std::cout << "PASS: All cards returned to deck."
                   << std::endl;
     }

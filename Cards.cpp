@@ -6,7 +6,9 @@
 #include <cstdlib>
 #include <ctime>
 
+// ==================================================
 // CARD
+// ==================================================
 
 Card::Card() {
     type = CardType::BOMB;
@@ -55,7 +57,7 @@ std::string Card::getTypeName() const {
     return "Unknown";
 }
 
-// Play a card and add its order to the player's list
+// Play a card and add its order to the player's OrdersList.
 void Card::play(Player* player, Hand* hand, Deck* deck) {
 
     if (player == nullptr || hand == nullptr || deck == nullptr) {
@@ -66,6 +68,12 @@ void Card::play(Player* player, Hand* hand, Deck* deck) {
 
     if (hand->getDeck() != deck) {
         std::cout << "Cannot play card: incorrect deck."
+                  << std::endl;
+        return;
+    }
+
+    if (player->getCardHand() != hand) {
+        std::cout << "Cannot play card: incorrect player hand."
                   << std::endl;
         return;
     }
@@ -90,8 +98,7 @@ void Card::play(Player* player, Hand* hand, Deck* deck) {
         newOrder = new Bomb();
     }
     else if (type == CardType::REINFORCEMENT) {
-        // Proposed mapping: Reinforcement creates a Deploy order.
-        // Confirm with the team or TA.
+        // Temporary mapping. Confirm with TA.
         newOrder = new Deploy();
     }
     else if (type == CardType::BLOCKADE) {
@@ -105,21 +112,20 @@ void Card::play(Player* player, Hand* hand, Deck* deck) {
     }
 
     if (newOrder == nullptr) {
+        std::cout << "Unknown card type." << std::endl;
         return;
     }
 
-    // Remove the card before transferring it to the deck
+    // Remove card from Hand without deleting it.
     if (!hand->removeCard(this)) {
         delete newOrder;
-        std::cout << "Could not remove card from hand."
-                  << std::endl;
         return;
     }
 
-    // OrdersList takes ownership of the new order
+    // OrdersList now owns the new Order.
     orders->addOrder(newOrder);
 
-    // Deck takes ownership of the played card
+    // Deck now owns the played Card.
     deck->returnCard(this);
 
     std::cout << getTypeName()
@@ -131,7 +137,9 @@ std::ostream& operator<<(std::ostream& out, const Card& card) {
     return out;
 }
 
+// ==================================================
 // DECK
+// ==================================================
 
 Deck::Deck() {
     cards.push_back(new Card(CardType::BOMB));
@@ -148,12 +156,14 @@ Deck::Deck() {
     }
 }
 
+// Deep copy constructor.
 Deck::Deck(const Deck& other) {
     for (Card* card : other.cards) {
         cards.push_back(new Card(*card));
     }
 }
 
+// Destructor: delete cards still in the Deck.
 Deck::~Deck() {
     for (Card* card : cards) {
         delete card;
@@ -162,22 +172,21 @@ Deck::~Deck() {
     cards.clear();
 }
 
+// Deep copy assignment operator.
 Deck& Deck::operator=(const Deck& other) {
     if (this != &other) {
-        for (Card* card : cards) {
-            delete card;
-        }
 
-        cards.clear();
+        // Copy first so the original cards remain
+        // unchanged if copying fails.
+        Deck copy(other);
 
-        for (Card* card : other.cards) {
-            cards.push_back(new Card(*card));
-        }
+        cards.swap(copy.cards);
     }
 
     return *this;
 }
 
+// Draw a random card and remove it from the Deck.
 Card* Deck::draw() {
     if (cards.empty()) {
         std::cout << "Deck is empty!" << std::endl;
@@ -187,16 +196,20 @@ Card* Deck::draw() {
     int index = std::rand() % cards.size();
 
     Card* drawnCard = cards[index];
+
     cards.erase(cards.begin() + index);
 
+    // Hand will own this card once it is added.
     return drawnCard;
 }
 
+// Return a played card to the Deck.
 void Deck::returnCard(Card* card) {
     if (card == nullptr) {
         return;
     }
 
+    // Avoid storing the same pointer twice.
     for (Card* existing : cards) {
         if (existing == card) {
             return;
@@ -218,12 +231,15 @@ std::ostream& operator<<(std::ostream& out, const Deck& deck) {
     return out;
 }
 
+// ==================================================
 // HAND
+// ==================================================
 
 Hand::Hand(Deck* deck) {
     this->deck = deck;
 }
 
+// Deep copy constructor.
 Hand::Hand(const Hand& other) {
     deck = other.deck;
 
@@ -232,6 +248,7 @@ Hand::Hand(const Hand& other) {
     }
 }
 
+// Destructor: delete cards still in the Hand.
 Hand::~Hand() {
     for (Card* card : handCards) {
         delete card;
@@ -240,19 +257,15 @@ Hand::~Hand() {
     handCards.clear();
 }
 
+// Deep copy assignment operator.
 Hand& Hand::operator=(const Hand& other) {
     if (this != &other) {
-        for (Card* card : handCards) {
-            delete card;
-        }
 
-        handCards.clear();
+        // Make a copy before deleting existing cards.
+        Hand copy(other);
 
+        handCards.swap(copy.handCards);
         deck = other.deck;
-
-        for (Card* card : other.handCards) {
-            handCards.push_back(new Card(*card));
-        }
     }
 
     return *this;
@@ -276,6 +289,8 @@ bool Hand::hasCard(Card* card) const {
     return false;
 }
 
+// Remove card without deleting it.
+// The Deck will take ownership when the card is played.
 bool Hand::removeCard(Card* card) {
     for (int i = 0; i < static_cast<int>(handCards.size()); i++) {
         if (handCards[i] == card) {
@@ -287,11 +302,10 @@ bool Hand::removeCard(Card* card) {
     return false;
 }
 
-// Play every card in the hand
+// Play every card in the Hand.
 void Hand::playAll(Player* player) {
     if (player == nullptr || deck == nullptr) {
-        std::cout << "Cannot play cards."
-                  << std::endl;
+        std::cout << "Cannot play cards." << std::endl;
         return;
     }
 
@@ -299,12 +313,12 @@ void Hand::playAll(Player* player) {
 
     while (i < static_cast<int>(handCards.size())) {
         Card* card = handCards[i];
+
         int oldSize = getSize();
 
         card->play(player, this, deck);
 
-        // A successfully played card is removed from the hand.
-        // If it wasn't removed, move to the next card.
+        // If card was not removed, move to next card.
         if (getSize() == oldSize) {
             i++;
         }
