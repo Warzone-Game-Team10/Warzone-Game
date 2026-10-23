@@ -1,4 +1,3 @@
-
 #pragma once
 
-void testCards();
+bool testCards();

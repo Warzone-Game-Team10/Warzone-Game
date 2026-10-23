@@ -1,4 +1,3 @@
-
 #include "MapDriver.h"
 #include "CardsDriver.h"
 
@@ -27,7 +26,8 @@ int main(int argc, char* argv[]) {
     }
 
     if (argc > 3 ||
-        (command != "map" && command != "cards" && command != "all")) {
+        (command != "map" && command != "cards" && command != "all") ||
+        (argc == 3 && command == "cards")) {
         printUsage(std::cerr, argv[0]);
         return 1;
     }
@@ -54,7 +54,9 @@ int main(int argc, char* argv[]) {
         if (command == "cards" || command == "all") {
             std::cout << "\n--- Part 4: Cards ---\n";
 
-            testCards();
+            if (!testCards()) {
+                passed = false;
+            }
         }
 
         std::cout << (passed ? "\nALL SELECTED TESTS PASSED\n"
@@ -67,4 +69,3 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 }
-
