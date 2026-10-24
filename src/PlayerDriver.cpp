@@ -100,15 +100,15 @@ void testingSetOrder(Player* player1){
 
 void testingIssueOrder(Player* player1){
     //display before and dereferencing
-    cout<<"BEFORE- issueOrder"<<endl << *player1<<endl;  
+    cout<<"BEFORE- issueOrder"<<endl << *(player1->getOrdersList())<<endl;  
 
     //issue one correct order and one bad order for testing
     cout<<"Now adding Bomb order and a Foo order" <<endl<<endl;
-    player1->issueOrder("Deploy");
+    player1->issueOrder("Bomb");
     player1->issueOrder("Foo");
 
     //display after and dereferencing
-    cout<<endl<<"AFTER- issueOrder"<<endl << *player1<<endl;  
+    cout<<endl<<"AFTER- issueOrder"<<endl << *(player1->getOrdersList())<<endl;  
 }
 
 void testToDefend(Player* player){
@@ -205,16 +205,14 @@ int main(){
     cout<<endl<<"==============================[TESTING: SET TERRITORY]================================================="<<endl;
     testSetTerritory(gameMap, player1);
 
+    cout<<endl<<"==============================[TESTING: SET ORDER]================================================="<<endl;
+    testingSetOrder(player1);
+
     cout<<endl<<"==============================[TESTING: SET CARD]================================================="<<endl;
     //create desk so we can use it for hands
     Deck* deck = new Deck();
     testSetCardHand(player1, deck);
-    //make player 1 play all their cards.
-    cout<<endl<<endl<<"----Make player 1 play all their cards---"<<endl;
-    player1->getCardHand()->playAll(player1);
-
-    cout<<endl<<"==============================[TESTING: SET ORDER]================================================="<<endl;
-    testingSetOrder(player1);
+    
     
     cout<<endl<<"==============================[TESTING: ISSUE ORDER]================================================="<<endl;
     testingIssueOrder(player1);
@@ -235,5 +233,5 @@ int main(){
     delete player1;
     delete deck;
     delete gameMap;//because loadMap returns a smart pointer we need to delete even if the "new" key word is not used
-    return 1;
+    return 0;
 }
