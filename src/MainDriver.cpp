@@ -1,5 +1,6 @@
 #include "MapDriver.h"
 #include "CardsDriver.h"
+#include "OrdersDriver.h"
 
 #include <exception>
 #include <filesystem>
@@ -26,8 +27,8 @@ int main(int argc, char* argv[]) {
     }
 
     if (argc > 3 ||
-        (command != "map" && command != "cards" && command != "all") ||
-        (argc == 3 && command == "cards")) {
+    (command != "map" && command != "cards" && command != "orders" && command != "all") ||
+    (argc == 3 && (command == "cards" || command == "orders"))) {
         printUsage(std::cerr, argv[0]);
         return 1;
     }
@@ -46,6 +47,15 @@ int main(int argc, char* argv[]) {
             std::cout << "--- Part 1: Map ---\n";
 
             if (!testMaps(mapDirectory)) {
+                passed = false;
+            }
+        }
+
+        // Part 3: Orders
+        if (command == "orders" || command == "all") {
+            std::cout << "\n--- Part 3: Orders ---\n";
+
+            if (!testOrders()) {
                 passed = false;
             }
         }
