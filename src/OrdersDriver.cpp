@@ -2,7 +2,7 @@
 #include <iostream>
 #include "OrdersDriver.h"
 
-int main() {
+bool testOrders() {
     std::cout << "==================================================" << std::endl;
     std::cout << "       COMP 345 - WARZONE ORDERS TESTING HARNESS  " << std::endl;
     std::cout << "==================================================" << std::endl << std::endl;
@@ -54,5 +54,5 @@ int main() {
 
     // When main exits, mainQueue's destructor fires automatically sweeping 
     // up all remaining heap data blocks cleanly.
-    return 0;
+    return true;
 }
