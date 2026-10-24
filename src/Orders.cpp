@@ -169,6 +169,10 @@ void Deploy::execute() {
 }
 
 
+Order* Deploy::clone() const {
+    return new Deploy(*this); // Safely duplicates the child class 
+}
+
 
 
 
@@ -213,7 +217,9 @@ void Advance::execute() {
     }
 }
 
-
+Order* Advance::clone() const {
+    return new Advance(*this);
+}
 
 
 
@@ -265,6 +271,10 @@ void Bomb::execute() {
     }
 }
 
+
+Order* Bomb::clone() const {
+    return new Bomb(*this);
+}
 
 
 
@@ -321,6 +331,10 @@ void Blockade::execute() {
 }
 
 
+Order* Blockade::clone() const {
+    return new Blockade(*this);
+}
+
 
 
 
@@ -367,7 +381,9 @@ void Airlift::execute() {
 }
 
 
-
+Order* Airlift::clone() const {
+    return new Airlift(*this);
+}
 
 
 
@@ -413,6 +429,10 @@ void Negotiate::execute() {
 }
 
 
+Order* Negotiate::clone() const {
+    return new Negotiate(*this);
+}
+
 
 
 
@@ -438,10 +458,10 @@ OrdersList::OrdersList( const OrdersList& other){
     // Loop through the other list, find every order pointer, 
     // duplicate its text deeply, and add it to our new vector.
     for (size_t i = 0; i < other.list.size(); ++i) {
-    if (other.list[i] != nullptr) {
-        // This copies the base instance reference safely without slicing object boundaries
-        list.push_back(new Order(*other.list[i])); 
-    }
+        if (other.list[i] != nullptr) {
+            // This copies the base instance reference safely without slicing object boundaries
+            list.push_back(other.list[i]->clone()); 
+        }
 }
 
     }
@@ -476,7 +496,7 @@ OrdersList& OrdersList::operator=(const OrdersList& other) {
         // 2. perform a deep copy from the 'other' list
         for (size_t i = 0; i < other.list.size(); ++i) {
             if (other.list[i] != nullptr) {
-                list.push_back(new Order(*other.list[i]));
+                list.push_back(other.list[i]->clone());
             }
         }
     }
