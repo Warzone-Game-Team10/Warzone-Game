@@ -24,6 +24,10 @@ public:
     // ASSIGNMENT OPERATOR 
     Order& operator=(const Order& other);   // w/o this C++ defaults to a shallow copy when we assign smth like order1=order2 
 
+
+    // CLONE METHOD 
+   virtual Order* clone() const = 0
+
     // FRIEND OPERATOR 
     friend std::ostream& operator<<(std::ostream& outs, const Order& order);
 
@@ -56,6 +60,8 @@ public:
 
     bool validate() override;       
     void execute() override; 
+
+    Order* clone() const override;
 };
 
 
@@ -73,6 +79,8 @@ public:
 
     bool validate() override; 
     void execute() override; 
+
+    Order* clone() const override;
 };
 
 
@@ -91,6 +99,8 @@ public:
     bool validate() override; 
     void execute() override; 
 
+    Order* clone() const override;
+
 };
 
 
@@ -108,6 +118,8 @@ public:
 
     bool validate() override; 
     void execute() override; 
+
+    Order* clone() const override;
 };
 
 
@@ -124,6 +136,8 @@ public:
 
     bool validate() override;
     void execute() override;
+
+    Order* clone() const override;
 };
 
 
@@ -140,6 +154,8 @@ public:
 
     bool validate() override; 
     void execute() override;
+
+    Order* clone() const override;
 };
 
 //========================================   ORDERS LIST CLASS   ============================================================
