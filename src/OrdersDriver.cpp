@@ -49,7 +49,7 @@ bool testOrders() {
     op6->execute(); // Polymorphically calls Negotiate logic overrides
 
     std::cout << std::endl << "==================================================" << std::endl;
-    std::cout << "   TEST RUN COMPLETE - 0 MEMORY LEAKS DETECTED    " << std::endl;
+    std::cout << "                 TEST RUN COMPLETE                   " << std::endl;
     std::cout << "==================================================" << std::endl;
 
     // When main exits, mainQueue's destructor fires automatically sweeping 
