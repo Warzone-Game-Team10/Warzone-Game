@@ -2,7 +2,7 @@
 #include <iostream>
 #include "OrdersDriver.h"
 
-int main() {
+bool testOrders() {
     std::cout << "==================================================" << std::endl;
     std::cout << "       COMP 345 - WARZONE ORDERS TESTING HARNESS  " << std::endl;
     std::cout << "==================================================" << std::endl << std::endl;
@@ -49,10 +49,10 @@ int main() {
     op6->execute(); // Polymorphically calls Negotiate logic overrides
 
     std::cout << std::endl << "==================================================" << std::endl;
-    std::cout << "   TEST RUN COMPLETE - 0 MEMORY LEAKS DETECTED    " << std::endl;
+    std::cout << "                 TEST RUN COMPLETE                   " << std::endl;
     std::cout << "==================================================" << std::endl;
 
     // When main exits, mainQueue's destructor fires automatically sweeping 
     // up all remaining heap data blocks cleanly.
-    return 0;
+    return true;
 }
