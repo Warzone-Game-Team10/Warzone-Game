@@ -48,6 +48,20 @@ bool testOrders() {
     op3->execute(); // Polymorphically calls Bomb logic overrides
     op6->execute(); // Polymorphically calls Negotiate logic overrides
 
+
+    // ---- ADDED DIAGNOSTIC PIECES HERE TO PROVE DOWNCASTING/CLONING WORKS ----
+    std::cout << "\n[Step 6] Testing copy constructor..." << std::endl;
+    OrdersList crashedList(mainQueue); // ◄ Added this back so it compiles!
+
+    std::cout << "\nPrinting copied queue to verify subclass preservation:" << std::endl;
+    std::cout << crashedList << std::endl;
+
+    std::cout << "\nTesting Deep Copy Assignment Operator Vibe Check:" << std::endl;
+    OrdersList assignedList;
+    assignedList = mainQueue;
+    std::cout << assignedList << std::endl;
+    // -------------------------------------------------------------------------
+
     std::cout << std::endl << "==================================================" << std::endl;
     std::cout << "                 TEST RUN COMPLETE                   " << std::endl;
     std::cout << "==================================================" << std::endl;
