@@ -1,10 +1,10 @@
 #pragma once
 
 #include <iostream>
-#include <vector>
 #include <string>
+#include <vector>
 
-// Five types of Warzone cards
+// The five card types required for Warzone.
 enum class CardType {
     BOMB,
     REINFORCEMENT,
@@ -14,17 +14,17 @@ enum class CardType {
 };
 
 class Player;
-class Deck;
 class Hand;
+class Deck;
 
-// Represents one card
+// Represents one Warzone card.
 class Card {
 private:
     CardType type;
 
 public:
     Card();
-    Card(CardType type);
+    explicit Card(CardType type);
     Card(const Card& other);
     ~Card();
 
@@ -33,14 +33,14 @@ public:
     CardType getType() const;
     std::string getTypeName() const;
 
-    // Creates an order and returns the played card to the deck
+    // Plays the card and transfers it from Hand to Deck.
     void play(Player* player, Hand* hand, Deck* deck);
 
     friend std::ostream& operator<<(std::ostream& out,
                                     const Card& card);
 };
 
-// Stores cards available to draw
+// Owns all Card pointers currently stored in the Deck.
 class Deck {
 private:
     std::vector<Card*> cards;
@@ -52,29 +52,38 @@ public:
 
     Deck& operator=(const Deck& other);
 
+    // Draws a random card and transfers ownership to the caller.
     Card* draw();
+
+    // Takes ownership of a card returned to the Deck.
     void returnCard(Card* card);
+
     int getSize() const;
 
     friend std::ostream& operator<<(std::ostream& out,
                                     const Deck& deck);
 };
 
-// Stores cards belonging to a player
+// Owns cards in the Hand.
+// Does NOT own the Deck pointer.
 class Hand {
 private:
     std::vector<Card*> handCards;
-    Deck* deck; // Hand does not own the Deck
+    Deck* deck;
 
 public:
-    Hand(Deck* deck);
+    explicit Hand(Deck* deck);
     Hand(const Hand& other);
     ~Hand();
 
     Hand& operator=(const Hand& other);
 
+    // Hand takes ownership of the added Card.
     void addCard(Card* card);
+
+    // Removes the Card without deleting it.
     bool removeCard(Card* card);
+
     bool hasCard(Card* card) const;
 
     void playAll(Player* player);
@@ -85,6 +94,4 @@ public:
     friend std::ostream& operator<<(std::ostream& out,
                                     const Hand& hand);
 };
-// Remove once the Player teammate changes Cards* to Hand*.
-using Cards = Hand;
 

@@ -1,4 +1,5 @@
 #include "MapDriver.h"
+#include "CardsDriver.h"
 
 #include <exception>
 #include <filesystem>
@@ -8,35 +9,61 @@
 namespace {
 
 void printUsage(std::ostream& out, const char* program) {
-    out << "Usage: " << program << " [map|all] [maps-directory]\n"
+    out << "Usage: " << program << " [map|cards|all] [maps-directory]\n"
         << "       " << program << " --help\n"
         << "Defaults: all tests, maps/ directory\n"
-        << "Available components: map\n";
+        << "Available components: map, cards\n";
 }
 
-} 
+}
 
 int main(int argc, char* argv[]) {
     const std::string_view command = argc > 1 ? argv[1] : "all";
+
     if (argc == 2 && command == "--help") {
         printUsage(std::cout, argv[0]);
         return 0;
     }
-    if (argc > 3 || (command != "map" && command != "all")) {
+
+    if (argc > 3 ||
+        (command != "map" && command != "cards" && command != "all") ||
+        (argc == 3 && command == "cards")) {
         printUsage(std::cerr, argv[0]);
         return 1;
     }
 
     try {
-        const std::filesystem::path mapDirectory = argc == 3 ? argv[2] : "maps";
-        std::cout << "=== COMP 345 - Warzone tests ===\n"
-                  << "Running: " << command << "\n\n"
-                  << "--- Part 1: Map ---\n";
+        const std::filesystem::path mapDirectory =
+            argc == 3 ? argv[2] : "maps";
 
-        const bool passed = testMaps(mapDirectory);
+        std::cout << "=== COMP 345 - Warzone tests ===\n"
+                  << "Running: " << command << "\n\n";
+
+        bool passed = true;
+
+        // Part 1: Map
+        if (command == "map" || command == "all") {
+            std::cout << "--- Part 1: Map ---\n";
+
+            if (!testMaps(mapDirectory)) {
+                passed = false;
+            }
+        }
+
+        // Part 4: Cards
+        if (command == "cards" || command == "all") {
+            std::cout << "\n--- Part 4: Cards ---\n";
+
+            if (!testCards()) {
+                passed = false;
+            }
+        }
+
         std::cout << (passed ? "\nALL SELECTED TESTS PASSED\n"
                              : "\nSELECTED TESTS FAILED\n");
+
         return passed ? 0 : 1;
+
     } catch (const std::exception& error) {
         std::cerr << "FAIL: " << error.what() << '\n';
         return 1;
