@@ -212,7 +212,7 @@ Normally, std::cout only knows how to print basic built-in types like integers,
 floats, or strings. If you try to do this:
 -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -
 Order myOrder;
-std::cout << myOrder; // ❌ ERROR! The compiler has no idea what an "Order" looks like on screen.
+std::cout << myOrder; // Error:The compiler has no idea what an "Order" looks like on screen.
 -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -
 */
 
