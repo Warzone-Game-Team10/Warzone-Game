@@ -1,7 +1,9 @@
 #include <stdio.h>
 #include <iostream>
 #include <cmath> // Required for std::floor
+#include <filesystem>
 
+#include "PlayerDriver.h"
 #include "Player.h"
 #include "Cards.h"
 #include "Orders.h"
@@ -182,20 +184,19 @@ void testCopyConstructor( Player* player1, Map* gameMap, Deck* deck){
 
 
 
-int main(){
+bool testPlayer(const std::filesystem::path& mapFile) {
 
     //=========Read the file=======
     MapLoader* loader = new MapLoader();
     Map* gameMap = nullptr;
     try {
         //use the nyc.map for testing
-        gameMap = loader->loadMap("../maps/nyc/NYC.map").release();
+        gameMap = loader->loadMap(mapFile.string()).release();
     } catch (std::exception& error) {
         std::cout << "Could not load map: " << error.what() << std::endl;
         delete loader;
-        return 1;
+        return false;
     }
-    
     
     //=====create players=====
     Player* player1= new Player();
@@ -233,5 +234,5 @@ int main(){
     delete player1;
     delete deck;
     delete gameMap;//because loadMap returns a smart pointer we need to delete even if the "new" key word is not used
-    return 0;
+    return true;
 }

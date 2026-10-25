@@ -1,5 +1,8 @@
 #include "MapDriver.h"
 #include "CardsDriver.h"
+#include "PlayerDriver.h"
+#include "OrdersDriver.h"
+#include "GameEngineDriver.h"
 
 #include <exception>
 #include <filesystem>
@@ -9,10 +12,10 @@
 namespace {
 
 void printUsage(std::ostream& out, const char* program) {
-    out << "Usage: " << program << " [map|cards|all] [maps-directory]\n"
+    out << "Usage: " << program << " [map|player|orders|cards|gameengine|all] [maps-directory]\n"
         << "       " << program << " --help\n"
         << "Defaults: all tests, maps/ directory\n"
-        << "Available components: map, cards\n";
+        << "Available components: map, player, orders, cards\n";
 }
 
 }
@@ -26,8 +29,8 @@ int main(int argc, char* argv[]) {
     }
 
     if (argc > 3 ||
-        (command != "map" && command != "cards" && command != "all") ||
-        (argc == 3 && command == "cards")) {
+        (command != "map" && command != "player" && command != "orders" && command != "cards" && command != "gameengine" && command != "all") ||
+        (argc == 3 && (command == "cards" || command == "gameengine"))) {
         printUsage(std::cerr, argv[0]);
         return 1;
     }
@@ -36,27 +39,52 @@ int main(int argc, char* argv[]) {
         const std::filesystem::path mapDirectory =
             argc == 3 ? argv[2] : "maps";
 
-        std::cout << "=== COMP 345 - Warzone tests ===\n"
+        std::cout << "============================ COMP 345 - Warzone tests ============================\n"
                   << "Running: " << command << "\n\n";
 
         bool passed = true;
 
         // Part 1: Map
         if (command == "map" || command == "all") {
-            std::cout << "--- Part 1: Map ---\n";
-
+            std::cout << "-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-= Part 1: Map -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=\n";
             if (!testMaps(mapDirectory)) {
+                passed = false;
+            }
+        }
+
+        // Part 2: Player
+        if (command == "player" || command == "all") {
+            std::cout << "\n-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-= Part 2: Player -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=\n";
+
+            if (!testPlayer(mapDirectory / "nyc" / "NYC.map")) {
+                passed = false;
+            }
+        }
+
+        // Part 3: Orders
+        if (command == "orders" || command == "all") {
+            std::cout << "\n-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- Part 3: Orders -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=\n";
+
+            if (!testOrders()) {
                 passed = false;
             }
         }
 
         // Part 4: Cards
         if (command == "cards" || command == "all") {
-            std::cout << "\n--- Part 4: Cards ---\n";
+            std::cout << "\n=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- Part 4: Cards =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-\n";
 
             if (!testCards()) {
                 passed = false;
             }
+        }
+
+        // Part 5: Game Engine
+        // doesnt run make run-engine cause it requirse user input
+        if (command == "gameengine") {
+            std::cout << "\n=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-= Part 5: Game Engine =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=\n";
+
+            testGameStates();
         }
 
         std::cout << (passed ? "\nALL SELECTED TESTS PASSED\n"
