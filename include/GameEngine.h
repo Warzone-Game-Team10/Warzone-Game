@@ -3,6 +3,7 @@
 #include <iostream>
 #include <map>
 #include <vector>
+#include <string>
 
 // GAME ENGINE: controls flow of the game with state, transition & command
 class GameEngine {

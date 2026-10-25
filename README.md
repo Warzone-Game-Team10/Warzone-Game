@@ -29,6 +29,7 @@ This compiles the source files and runs the Warzone test drivers with the all ar
 The currently available make commands are:
 - `make` : Compiles the source files and generates warzone.exe
 - `make run` : Compiles the project if needed, then runs all tests
+- `make run-engine` : Compiles the project if needed, then runs test for GameEngine only
 - `make clean` : Removes compiled object files (.o) and the executable
 
 ### Clean and Rebuild
