@@ -41,8 +41,13 @@ protected:
     // a pointer to a string that would hold the order's description 
     std::string* description; 
 
+    // Every attempt discards the old result and checks the current game context.
+    bool validateExecution();
+    void recordEffect(const std::string& action);
 
-
+private:
+    std::string* effect;
+    bool executed;
 };
 
 //============================= 6 SUBLCASSES (DIFFERENT ORDERS)  =============================

@@ -371,9 +371,176 @@ void testInteractionValidation() {
     checkValidation(negotiateCopy.validate(), "Negotiation does not require owned territories");
 }
 
+std::string printedOrder(const Order& order) {
+    std::ostringstream text;
+    text << order;
+    return text.str();
+}
+
+const char* const effectDescriptions[] = {"Deploy 3 armies to Effect source", "Advance 3 armies from Effect source to Effect target",
+        "Bomb Effect target", "Blockade Effect source", "Airlift 3 armies from Effect source to Effect target",
+        "Negotiate with Effect opponent"};
+const char* const effectActions[] = {"deployment of 3 armies to Effect source", "advance of 3 armies from Effect source to Effect target",
+        "bombing of Effect target", "blockade of Effect source", "airlift of 3 armies from Effect source to Effect target",
+        "negotiation between Effect issuer and Effect opponent"};
+
+void testEffectsBeforeAndAfterExecution(OrdersList& original, std::string executedText[]) {
+    OrdersList unexecutedCopy(original);
+    OrdersList unexecutedAssignment;
+    unexecutedAssignment = original;
+    for (int index = 0; index < 6; ++index) {
+        Order& order = *original.getOrder(index);
+        const std::string label = effectDescriptions[index];
+        const std::string before = printedOrder(order);
+        checkValidation(before.find(label) != std::string::npos && before.find("Effect:") == std::string::npos,
+                        label + " describes intent without an effect before execution");
+        checkExecution(order, true, label);
+        executedText[index] = printedOrder(order);
+        checkValidation(executedText[index].find("Effect: Simulated " + std::string(effectActions[index]) +
+                        " (game state unchanged).") != std::string::npos, label + " stores its demonstration effect");
+        checkExecution(order, true, label + " repeated execution");
+        checkValidation(printedOrder(order) == executedText[index], label + " replaces rather than appends effects");
+        for (OrdersList* list : {&unexecutedCopy, &unexecutedAssignment}) {
+            checkValidation(printedOrder(*list->getOrder(index)) == before, label + " copy stays unexecuted independently");
+            checkExecution(*list->getOrder(index), true, label + " copied before execution");
+            checkValidation(printedOrder(*list->getOrder(index)) == executedText[index], label + " copy executes normally");
+        }
+    }
+}
+
+void testStoredNegotiationEffect(Order& order, Player& issuer, const std::string& expectedText) {
+    // Printing uses the recorded result; another valid attempt replaces it using current context.
+    issuer.setName("Renamed issuer");
+    checkValidation(printedOrder(order) == expectedText, "Negotiation effect is stored, not recomputed when printed");
+    checkExecution(order, true, "Negotiation after name change");
+    checkValidation(printedOrder(order).find("negotiation between Renamed issuer and Effect opponent") != std::string::npos,
+                    "Repeated negotiation records the current outcome");
+    issuer.setName("Effect issuer");
+}
+
+void testEffectRejection(OrdersList& original, Player& issuer, Territory& source, Territory& target) {
+    source.setArmyCount(0);
+    issuer.setTerritoryList({});
+    target.setOwner(nullptr);
+    for (int index = 0; index < 5; ++index) {
+        checkExecution(*original.getOrder(index), false, std::string(effectDescriptions[index]) + " after context changes");
+        checkValidation(printedOrder(*original.getOrder(index)).find("Effect:") == std::string::npos,
+                        std::string(effectDescriptions[index]) + " rejection clears the earlier effect");
+    }
+    auto* negotiation = dynamic_cast<Negotiate*>(original.getOrder(5));
+    *negotiation = Negotiate(&issuer, &issuer);
+    checkExecution(*negotiation, false, "Invalid negotiation replaces earlier success");
+    checkValidation(printedOrder(*negotiation).find("Effect:") == std::string::npos, "Invalid negotiation has no successful effect");
+}
+
+void testEffectRecovery(OrdersList& original, Player& issuer, Player& opponent,
+                        Territory& source, Territory& target, const std::string executedText[]) {
+    // A later valid attempt may succeed after a rejection.
+    source.setArmyCount(5);
+    target.setOwner(&opponent);
+    issuer.addTerritory(&source);
+    *dynamic_cast<Negotiate*>(original.getOrder(5)) = Negotiate(&issuer, &opponent);
+    for (int index = 0; index < 6; ++index) {
+        checkExecution(*original.getOrder(index), true, std::string(effectDescriptions[index]) + " after recovery");
+        checkValidation(printedOrder(*original.getOrder(index)) == executedText[index], "Recovery records a fresh successful effect");
+    }
+}
+
+void testDefaultOrderEffects() {
+    OrdersList defaults;
+    addAllOrderTypes(defaults);
+    for (int index = 0; index < 6; ++index) {
+        checkExecution(*defaults.getOrder(index), false, "Default order has no successful effect");
+        checkValidation(printedOrder(*defaults.getOrder(index)).find("Effect:") == std::string::npos,
+                        "Invalid default orders print no effect");
+    }
+}
+
+void testExecutionEffects() {
+    Player issuer;
+    Player opponent;
+    issuer.setName("Effect issuer");
+    opponent.setName("Effect opponent");
+    Territory source(30, "Effect source");
+    Territory target(31, "Effect target");
+    source.setArmyCount(5);
+    target.setArmyCount(9);
+    source.setOwner(&issuer);
+    target.setOwner(&opponent);
+    source.addAdjacentTerritory(&target);
+    issuer.addTerritory(&source);
+    opponent.addTerritory(&target);
+    std::string executedText[6];
+    OrdersList survivingAssignment;
+    std::unique_ptr<OrdersList> survivingCopy;
+    {
+        // These map objects stay alive even when Player's cloned territory list changes.
+        OrdersList original;
+        original.addOrder(new Deploy(&issuer, &source, 3));
+        original.addOrder(new Advance(&issuer, &source, &target, 3));
+        original.addOrder(new Bomb(&issuer, &target));
+        original.addOrder(new Blockade(&issuer, &source));
+        original.addOrder(new Airlift(&issuer, &source, &target, 3));
+        original.addOrder(new Negotiate(&issuer, &opponent));
+        testEffectsBeforeAndAfterExecution(original, executedText);
+        survivingCopy = std::make_unique<OrdersList>(original);
+        survivingAssignment = original;
+        checkCopies(original, *survivingCopy, "Executed list copy construction");
+        checkCopies(original, survivingAssignment, "Executed list assignment");
+
+        Deploy deployAssigned;
+        Advance advanceAssigned;
+        Bomb bombAssigned;
+        Blockade blockadeAssigned;
+        Airlift airliftAssigned;
+        Negotiate negotiateAssigned;
+        deployAssigned = *dynamic_cast<Deploy*>(original.getOrder(0));
+        advanceAssigned = *dynamic_cast<Advance*>(original.getOrder(1));
+        bombAssigned = *dynamic_cast<Bomb*>(original.getOrder(2));
+        blockadeAssigned = *dynamic_cast<Blockade*>(original.getOrder(3));
+        airliftAssigned = *dynamic_cast<Airlift*>(original.getOrder(4));
+        negotiateAssigned = *dynamic_cast<Negotiate*>(original.getOrder(5));
+        Order* directAssignments[] = {&deployAssigned, &advanceAssigned, &bombAssigned,
+                                     &blockadeAssigned, &airliftAssigned, &negotiateAssigned};
+        for (int index = 0; index < 6; ++index) {
+            checkValidation(printedOrder(*directAssignments[index]) == executedText[index],
+                            std::string(effectDescriptions[index]) + " direct assignment preserves execution state");
+        }
+        testStoredNegotiationEffect(*original.getOrder(5), issuer, executedText[5]);
+
+        testEffectRejection(original, issuer, source, target);
+        for (int index = 0; index < 6; ++index) {
+            checkValidation(printedOrder(*survivingCopy->getOrder(index)) == executedText[index] &&
+                            printedOrder(*survivingAssignment.getOrder(index)) == executedText[index] &&
+                            printedOrder(*directAssignments[index]) == executedText[index],
+                            std::string(effectDescriptions[index]) + " copied effects remain independent");
+        }
+        testEffectRecovery(original, issuer, opponent, source, target, executedText);
+        deployAssigned = Deploy(&issuer, &source, 3);
+        checkValidation(printedOrder(deployAssigned).find("Effect:") == std::string::npos,
+                        "Assigning an unexecuted order clears a destination's previous execution state");
+        Order& orderToAssign = *original.getOrder(0);
+        const Order& sameOrder = orderToAssign;
+        orderToAssign = sameOrder;
+        checkValidation(printedOrder(orderToAssign) == executedText[0], "Self-assignment preserves the stored effect");
+    }
+    for (int index = 0; index < 6; ++index) {
+        checkValidation(printedOrder(*survivingCopy->getOrder(index)) == executedText[index] &&
+                        printedOrder(*survivingAssignment.getOrder(index)) == executedText[index],
+                        "Copied effects survive destruction of the original orders");
+    }
+    testDefaultOrderEffects();
+    checkValidation(source.getArmyCount() == 5 && source.getOwner() == &issuer &&
+                    target.getArmyCount() == 9 && target.getOwner() == &opponent &&
+                    issuer.getTerritoryList().size() == 1 && opponent.getTerritoryList().size() == 1,
+                    "Demonstration effects leave armies and ownership unchanged");
+}
+
 }
 
 bool testOrders() {
+    testExecutionEffects();
+    std::cout << "PASS: Order execution-effect checks passed.\n";
     testInteractionValidation();
     std::cout << "PASS: Bomb and Negotiate validation checks passed.\n";
     Advance incompleteAdvance;
@@ -396,17 +563,30 @@ bool testOrders() {
     std::cout << "       COMP 345 - WARZONE ORDERS TESTING HARNESS  " << std::endl;
     std::cout << "==================================================" << std::endl << std::endl;
 
-    // 1. Create a master OrdersList queue tracker on the Stack
+    // Keep demonstration context alive until the orders list is destroyed.
+    Player issuer;
+    Player opponent;
+    issuer.setName("Alice");
+    opponent.setName("Bob");
+    Territory source(40, "Ontario");
+    Territory target(41, "Quebec");
+    source.setArmyCount(5);
+    target.setArmyCount(8);
+    source.setOwner(&issuer);
+    target.setOwner(&opponent);
+    source.addAdjacentTerritory(&target);
+    issuer.addTerritory(&source);
+    opponent.addTerritory(&target);
     OrdersList mainQueue;
 
     // 2. Instantiate one of every single required subclass order on the Heap (Rule #1)
     std::cout << "[Step 1] Instantiating All 6 Warzone Subclass Orders on Heap..." << std::endl;
-    Order* op1 = new Deploy();
-    Order* op2 = new Advance();
-    Order* op3 = new Bomb();
-    Order* op4 = new Blockade();
-    Order* op5 = new Airlift();
-    Order* op6 = new Negotiate();
+    Order* op1 = new Deploy(&issuer, &source, 3);
+    Order* op2 = new Advance(&issuer, &source, &target, 3);
+    Order* op3 = new Bomb(&issuer, &target);
+    Order* op4 = new Blockade(&issuer, &source);
+    Order* op5 = new Airlift(&issuer, &source, &target, 3);
+    Order* op6 = new Negotiate(&issuer, &opponent);
 
     // 3. Queue them into our container list using our addOrder method
     std::cout << "[Step 2] Appending Orders sequentially into the Queue container..." << std::endl;
@@ -432,10 +612,13 @@ bool testOrders() {
 
     // 7. Validate and Execute the remaining queue stream
     std::cout << "[Step 5] Launching Polymorphic Sequence Execution Loop..." << std::endl;
-    // (We will simulate a mini engine game cycle processing loop manually)
-    op1->execute(); // Polymorphically calls Deploy logic overrides
-    op3->execute(); // Polymorphically calls Bomb logic overrides
-    op6->execute(); // Polymorphically calls Negotiate logic overrides
+    // Incomplete orders can also be queued, but execution must reject them.
+    mainQueue.addOrder(new Deploy());
+    for (int index = 0; index < 6; ++index) {
+        Order* order = mainQueue.getOrder(index);
+        order->execute();
+        std::cout << *order << std::endl;
+    }
 
     std::cout << std::endl << "==================================================" << std::endl;
     std::cout << "   TEST RUN COMPLETE   " << std::endl;

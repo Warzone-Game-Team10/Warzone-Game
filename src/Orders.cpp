@@ -2,7 +2,8 @@
 #include "Player.h"
 #include <iostream>
 #include <memory>
-#include <string> 
+#include <string>
+#include <utility>
 
 //==========================================================================================
 //                  1. PARENT CLASS ( ORDER ) IMPLEMENTATION 
@@ -10,76 +11,38 @@
 
 
 // ----------  DEFAULT CONSTRUCTOR ------------
-Order::Order(){
-
-    description = new std::string("Generic Warzone Order");
-
+Order::Order() : description(nullptr), effect(nullptr), executed(false) {
+    // Keep temporary ownership until both string allocations succeed.
+    auto text = std::make_unique<std::string>("Generic Warzone Order");
+    effect = new std::string();
+    description = text.release();
 }
 
-
-// --------- COPY CONSTRUCTOR (DEEP COPY) ---------
-Order::Order(const Order& other){ 
-    // 
-
-    // 1. check if original object has a valid description block 
-    if(other.description != nullptr){
-
-        // 2. follow (other)'s arrow ( where its pointing at ), read the text n allocate a 
-        //    a brand new block on the heap, n store the copied text inside it.
-        description = new std::string(*(other.description));
-    }
-    else{
-        description = nullptr;
-    }
+// ---------- COPY CONSTRUCTOR (DEEP COPY) ----------
+// Copies own their description and effect strings, but subclasses still borrow players and territories.
+Order::Order(const Order& other) : description(nullptr), effect(nullptr), executed(other.executed) {
+    std::unique_ptr<std::string> text(other.description ? new std::string(*other.description) : nullptr);
+    effect = new std::string(*other.effect);
+    description = text.release();
 }
 
-
-// ------------------- DESTRUCTOR (prevents memory leaks) ------------------- 
-Order::~Order(){
-
-    // 1. we check if our pointer variable is currently holding a valid memory address .. 
-    if(description != nullptr){
-
-        delete description;         // follows where the pointer is pointing at, locates the string box on the heap n manually deletes it 
-                                    // frees the dynamic memory allocated for the string data on the heap
-        
-        description = nullptr;      /*
-                                     Wipes out the old dead address number inside our pointer variable and 
-                                     sets it to nullptr (sets pointer to null)
-                                     This completely prevents a Dangling Pointer error by ensuring
-                                     the pointer doesn't accidentally point to empty, raw computer memory.
-                                    */ 
-        
-    }
+// ---------- DESTRUCTOR ----------
+Order::~Order() {
+    delete description;
+    delete effect;
 }
 
-
-// ------------------- ASSIGNMENT OPERATOR  ------------------- 
-
+// ---------- ASSIGNMENT OPERATOR ----------
 Order& Order::operator=(const Order& other) {
-    // 1. Self-assignment check: make sure we aren't doing "order1 = order1;
-    if(this != &other){
-
-        // 2. clean up the old existing heap memory to prevent leaks 
-        if(description != nullptr){
-            delete description;
-        }
-
-
-        // 3. perform a deep copy of the text data 
-        if(other.description != nullptr){
-            description = new std::string(*(other.description));
-        } else {
-            description = nullptr;
-        }
-
+    if (this != &other) {
+        // Finish allocating both strings before replacing any existing state.
+        Order copy(other);
+        std::swap(description, copy.description);
+        std::swap(effect, copy.effect);
+        std::swap(executed, copy.executed);
     }
-
     return *this;
 }
-
-
-
 
 // Copy through the public interface without losing the dynamic order type.
 Order* Order::clone() const {
@@ -124,24 +87,27 @@ bool Order::validate(){
 
 //EXECUTE METHOD : 
 
-void Order::execute(){
-    // we must run validate() first!
-    if(validate()){
-        std::cout << " Executing order : " << *description << std::endl;
-    } else {
-        std::cout << " Order execution failed : invalid order. " << std::endl;
-
+bool Order::validateExecution() {
+    executed = false;
+    effect->clear();
+    if (!validate()) {
+        std::cout << "Order execution failed: invalid order (" << *description << ")." << std::endl;
+        return false;
     }
+    return true;
 }
 
+void Order::recordEffect(const std::string& action) {
+    *effect = "Simulated " + action + " (game state unchanged).";
+    executed = true;
+    std::cout << "Executing demonstration: " << *effect << std::endl;
+}
 
-
-
-
-
-
-
-
+void Order::execute() {
+    if (validateExecution()) {
+        recordEffect("execution of " + *description);
+    }
+}
 
 //=============================================================================================
 //                  2.  CHILD CLASSES IMPLEMENTATION 
@@ -150,16 +116,22 @@ void Order::execute(){
 
 // --------------- DEPLOY ORDER -----------------
 
+// Default constructor
 // Keep existing callers working; an order without context can be queued but is invalid.
 Deploy::Deploy() : Deploy(nullptr, nullptr, 0) {}
 
+// Parameterized constructor
 Deploy::Deploy(Player* issuer, Territory* target, int armyCount)
     : Order(), issuer(issuer), target(target), armyCount(armyCount) {
     // We reuse the parent class constructor to set up a specific description
     *description = "Deploy Order";
+    if (target != nullptr) {
+        *description = "Deploy " + std::to_string(armyCount) + " armies to " + target->getName() + ".";
+    }
 }
 
 
+// Copy constructor
 // Deep-copy the description, but keep references to the same player and target.
 Deploy::Deploy(const Deploy& other)
     : Order(other), issuer(other.issuer), target(other.target), armyCount(other.armyCount) {}
@@ -197,10 +169,8 @@ bool Deploy::validate() {
 
 // Execute 
 void Deploy::execute() {
-    if (validate()) {
-        std::cout << "Executing action: Troops deployed successfully!" << std::endl;
-    } else {
-        std::cout << "Deploy execution failed: invalid order." << std::endl;
+    if (validateExecution()) {
+        recordEffect("deployment of " + std::to_string(armyCount) + " armies to " + target->getName());
     }
 }
 
@@ -212,16 +182,20 @@ void Deploy::execute() {
 
 // --------------- ADVANCE ORDER --------------- 
 
-// Default orders remain queueable
+// Default constructor: incomplete orders remain queueable.
 Advance::Advance() : Advance(nullptr, nullptr, nullptr, 0) {}
 
+// Parameterized constructor
 Advance::Advance(Player* issuer, Territory* source, Territory* target, int armyCount)
     : Order(), issuer(issuer), source(source), target(target), armyCount(armyCount) {
-    *description = "Advance Order"; 
+    *description = "Advance Order";
+    if (source != nullptr && target != nullptr) {
+        *description = "Advance " + std::to_string(armyCount) + " armies from " + source->getName() + " to " + target->getName() + ".";
+    }
 }
 
 
-// Copy the description independently while preserving borrowed game-object links.
+// Copy constructor: copy the description independently while preserving borrowed player and territory links.
 Advance::Advance(const Advance& other)
     : Order(other), issuer(other.issuer), source(other.source), target(other.target), armyCount(other.armyCount) {}
 
@@ -262,10 +236,8 @@ bool Advance::validate() {
 
 // Execution Method
 void Advance::execute() {
-    if (validate()) {
-        std::cout << "Executing Action: Troops advanced across territories!" << std::endl;
-    } else {
-        std::cout << "Advance execution failed: invalid order." << std::endl;
+    if (validateExecution()) {
+        recordEffect("advance of " + std::to_string(armyCount) + " armies from " + source->getName() + " to " + target->getName());
     }
 }
 
@@ -277,17 +249,21 @@ void Advance::execute() {
 
 // --------------- BOMB ORDER --------------- 
 
-// Default orders remain queueable, but lack the context needed for validation.
+// Default constructor: orders remain queueable, but lack the context needed for validation.
 Bomb::Bomb() : Bomb(nullptr, nullptr) {}
 
+// Parameterized constructor
 Bomb::Bomb(Player* issuer, Territory* target)
     : Order(), issuer(issuer), target(target) {
-    *description = "Bomb Order"; 
+    *description = "Bomb Order";
+    if (target != nullptr) {
+        *description = "Bomb " + target->getName() + ".";
+    }
 }
 
 
 
-// Copy the description independently while preserving borrowed game-object links.
+// Copy constructor: copy the description independently while preserving borrowed player and territory links.
 Bomb::Bomb(const Bomb& other)
     : Order(other), issuer(other.issuer), target(other.target) {}
 
@@ -331,10 +307,8 @@ bool Bomb::validate() {
 
 // Execution Method
 void Bomb::execute() {
-    if (validate()) {
-        std::cout << "Executing Action: Target territory bombed! Enemy forces halved!" << std::endl;
-    } else {
-        std::cout << "Bomb execution failed: invalid order." << std::endl;
+    if (validateExecution()) {
+        recordEffect("bombing of " + target->getName());
     }
 }
 
@@ -346,16 +320,22 @@ void Bomb::execute() {
 
 // --------------- BLOCKADE ORDER --------------- 
 
+// Default constructor
 // Keep existing callers working; an order without context can be queued but is invalid.
 Blockade::Blockade() : Blockade(nullptr, nullptr) {}
 
+// Parameterized constructor
 Blockade::Blockade(Player* issuer, Territory* target)
     : Order(), issuer(issuer), target(target) {
     // we dereference our inherited pointer to assign our unique child text.
-    *description = "Blockade Order"; 
+    *description = "Blockade Order";
+    if (target != nullptr) {
+        *description = "Blockade " + target->getName() + ".";
+    }
 }
 
 
+// Copy constructor
 // Deep-copy the description, but keep references to the same player and target.
 Blockade::Blockade(const Blockade& other)
     : Order(other), issuer(other.issuer), target(other.target) {}
@@ -390,11 +370,8 @@ bool Blockade::validate() {
 
 // Execution Method
 void Blockade::execute() {
-    // Recheck current ownership on every attempt.
-    if (validate()) {
-        std::cout << "Executing Action: Territory blockaded! Friendly troops doubled, territory turned neutral!" << std::endl;
-    } else {
-        std::cout << "Blockade execution failed: invalid order." << std::endl;
+    if (validateExecution()) {
+        recordEffect("blockade of " + target->getName());
     }
 }
 
@@ -404,17 +381,21 @@ void Blockade::execute() {
 
 // ---------------  AIRLIFT ORDER --------------- 
 
-// Default orders remain queueable, but lack the context needed for validation.
+// Default constructor: orders remain queueable, but lack the context needed for validation.
 Airlift::Airlift() : Airlift(nullptr, nullptr, nullptr, 0) {}
 
+// Parameterized constructor
 Airlift::Airlift(Player* issuer, Territory* source, Territory* target, int armyCount)
     : Order(), issuer(issuer), source(source), target(target), armyCount(armyCount) {
     // We dereference our inherited pointer to assign our unique child text.
-    *description = "Airlift Order"; 
+    *description = "Airlift Order";
+    if (source != nullptr && target != nullptr) {
+        *description = "Airlift " + std::to_string(armyCount) + " armies from " + source->getName() + " to " + target->getName() + ".";
+    }
 }
 
 
-// Copy the description independently while preserving borrowed game-object links.
+// Copy constructor: copy the description independently while preserving borrowed player and territory links.
 Airlift::Airlift(const Airlift& other)
     : Order(other), issuer(other.issuer), source(other.source), target(other.target), armyCount(other.armyCount) {}
 
@@ -447,10 +428,8 @@ bool Airlift::validate() {
 
 // Execution Method
 void Airlift::execute() {
-    if (validate()) {
-        std::cout << "Executing Action: Troops airlifted to a distant territory!" << std::endl;
-    } else {
-        std::cout << "Airlift execution failed: invalid order." << std::endl;
+    if (validateExecution()) {
+        recordEffect("airlift of " + std::to_string(armyCount) + " armies from " + source->getName() + " to " + target->getName());
     }
 }
 
@@ -463,16 +442,20 @@ void Airlift::execute() {
 // --------------- NEGOTIATE ORDER --------------- 
 
 
-// Default orders remain queueable, but lack the context needed for validation.
+// Default constructor: orders remain queueable, but lack the context needed for validation.
 Negotiate::Negotiate() : Negotiate(nullptr, nullptr) {}
 
+// Parameterized constructor
 Negotiate::Negotiate(Player* issuer, Player* partner)
     : Order(), issuer(issuer), partner(partner) {
     // We dereference our inherited pointer to assign our unique child text.
-    *description = "Negotiate Order"; 
+    *description = "Negotiate Order";
+    if (partner != nullptr) {
+        *description = "Negotiate with " + partner->getName() + ".";
+    }
 }
 
-// Copy the description independently while preserving borrowed game-object links.
+// Copy constructor: copy the description independently while preserving borrowed player links.
 Negotiate::Negotiate(const Negotiate& other)
     : Order(other), issuer(other.issuer), partner(other.partner) {}
 
@@ -498,10 +481,8 @@ bool Negotiate::validate() {
 
 // Execution Method
 void Negotiate::execute() {
-    if (validate()) {
-        std::cout << "Executing Action: Peace agreement signed! Attacks prevented between players for this turn!" << std::endl;
-    } else {
-        std::cout << "Negotiate execution failed: invalid order." << std::endl;
+    if (validateExecution()) {
+        recordEffect("negotiation between " + issuer->getName() + " and " + partner->getName());
     }
 }
 
@@ -642,6 +623,9 @@ void OrdersList::move(int oldIndex, int newIndex) {
 std::ostream& operator<<(std::ostream& outs, const Order& order){
     // We dereference the internal description pointer to print the raw text words
     outs << "Order Description: " << *(order.description);
+    if (order.executed) {
+        outs << " Effect: " << *order.effect;
+    }
     return outs;
 }
 
