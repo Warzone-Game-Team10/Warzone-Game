@@ -17,6 +17,9 @@ class Player {
         Hand* cardHand;
         OrdersList* ordersList; 
 
+        // Build the copies for the player that will keep them.
+        Player(const Player& original, Player* destination);
+
     public:
     //==========BASIC FUNCTION==================
         //constructors

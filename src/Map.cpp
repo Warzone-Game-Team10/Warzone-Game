@@ -1,4 +1,5 @@
 #include "Map.h"
+#include <utility>
 
 #include <algorithm>
 #include <charconv>
@@ -92,6 +93,10 @@ void Territory::setArmyCount(int armyCount) {
 }
 
 // adjacency management
+void Territory::setAdjacentTerritories(std::vector<Territory*> territories) {
+    adjacentTerritories = std::move(territories);
+}
+
 void Territory::addAdjacentTerritory(Territory* territory) {
     if (std::find(adjacentTerritories.begin(), adjacentTerritories.end(), territory)
         == adjacentTerritories.end()) {

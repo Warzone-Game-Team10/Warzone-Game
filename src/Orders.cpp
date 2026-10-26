@@ -73,6 +73,81 @@ Negotiate* Negotiate::clone() const {
     return new Negotiate(*this);
 }
 
+// Find the copied territory by ID. For example, a link to the map's Ontario
+// becomes a link to the copied player's Ontario when their IDs match.
+namespace {
+Territory* copiedTerritory(Territory* territory,
+                           const std::unordered_map<int, Territory*>& territories) {
+    if (territory == nullptr || territories.empty()) {
+        return territory;
+    }
+    const auto found = territories.find(territory->getId());
+    return found == territories.end() ? territory : found->second;
+}
+}
+
+void Order::rebindContext(const Player*, Player*,
+                          const std::unordered_map<int, Territory*>&) {}
+
+void Deploy::rebindContext(const Player* original, Player* destination,
+                            const std::unordered_map<int, Territory*>& territories) {
+    if (issuer == original) {
+        issuer = destination;
+    }
+    target = copiedTerritory(target, territories);
+}
+
+void Advance::rebindContext(const Player* original, Player* destination,
+                            const std::unordered_map<int, Territory*>& territories) {
+    if (issuer == original) {
+        issuer = destination;
+    }
+    source = copiedTerritory(source, territories);
+    target = copiedTerritory(target, territories);
+}
+
+void Bomb::rebindContext(const Player* original, Player* destination,
+                            const std::unordered_map<int, Territory*>& territories) {
+    if (issuer == original) {
+        issuer = destination;
+    }
+    target = copiedTerritory(target, territories);
+}
+
+void Blockade::rebindContext(const Player* original, Player* destination,
+                            const std::unordered_map<int, Territory*>& territories) {
+    if (issuer == original) {
+        issuer = destination;
+    }
+    target = copiedTerritory(target, territories);
+}
+
+void Airlift::rebindContext(const Player* original, Player* destination,
+                            const std::unordered_map<int, Territory*>& territories) {
+    if (issuer == original) {
+        issuer = destination;
+    }
+    source = copiedTerritory(source, territories);
+    target = copiedTerritory(target, territories);
+}
+
+void Negotiate::rebindContext(const Player* original, Player* destination,
+                            const std::unordered_map<int, Territory*>&) {
+    if (issuer == original) {
+        issuer = destination;
+    }
+    if (partner == original) {
+        partner = destination;
+    }
+}
+
+void OrdersList::rebindContext(const Player* original, Player* destination,
+                               const std::unordered_map<int, Territory*>& territories) {
+    for (Order* order : list) {
+        order->rebindContext(original, destination, territories);
+    }
+}
+
 // ------------------- VALIDATE +  EXECUTE METHODS  ------------------- 
 
 //VALIDATE METHOD : 

@@ -63,6 +63,8 @@ public:
 
     // adjacency management
     void addAdjacentTerritory(Territory* territory);
+    // Replace the neighbour list so copied territories can point to each other.
+    void setAdjacentTerritories(std::vector<Territory*> territories);
 
     // stream insertion operator
     friend std::ostream& operator<<(std::ostream& out, const Territory& territory);

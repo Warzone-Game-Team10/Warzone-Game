@@ -7,6 +7,7 @@
 #include <iostream>  // will allow us to print text to the console 
 #include <vector> 
 #include <string>
+#include <unordered_map>
 
 class Player;
 class Territory;
@@ -34,6 +35,11 @@ public:
 
     // Caller owns the copy; subclasses preserve their specific type and state.
     virtual Order* clone() const;
+
+    // When copying a player, point this order to the new player and territory copies.
+    // Copying only the order keeps its links to the original players and territories.
+    virtual void rebindContext(const Player* original, Player* destination,
+                              const std::unordered_map<int, Territory*>& territories);
 
 
 protected:
@@ -66,6 +72,8 @@ public:
     Deploy& operator=(const Deploy& other);  // assignment operator 
 
     Deploy* clone() const override;
+    void rebindContext(const Player* original, Player* destination,
+                       const std::unordered_map<int, Territory*>& territories) override;
 
     bool validate() override;       
     void execute() override; 
@@ -91,6 +99,8 @@ public:
     Advance& operator=(const Advance& other);
 
     Advance* clone() const override;
+    void rebindContext(const Player* original, Player* destination,
+                       const std::unordered_map<int, Territory*>& territories) override;
 
     bool validate() override; 
     void execute() override; 
@@ -117,6 +127,8 @@ public:
     Bomb& operator=(const Bomb& other);
 
     Bomb* clone() const override;
+    void rebindContext(const Player* original, Player* destination,
+                       const std::unordered_map<int, Territory*>& territories) override;
 
     bool validate() override; 
     void execute() override; 
@@ -142,6 +154,8 @@ public:
     Blockade& operator=( const Blockade& other);
 
     Blockade* clone() const override;
+    void rebindContext(const Player* original, Player* destination,
+                       const std::unordered_map<int, Territory*>& territories) override;
 
     bool validate() override; 
     void execute() override; 
@@ -165,6 +179,8 @@ public:
     Airlift& operator=(const Airlift& other);
 
     Airlift* clone() const override;
+    void rebindContext(const Player* original, Player* destination,
+                       const std::unordered_map<int, Territory*>& territories) override;
 
     bool validate() override;
     void execute() override;
@@ -190,6 +206,8 @@ public:
     Negotiate& operator= (const Negotiate& other);
 
     Negotiate* clone() const override;
+    void rebindContext(const Player* original, Player* destination,
+                       const std::unordered_map<int, Territory*>& territories) override;
 
     bool validate() override; 
     void execute() override;
@@ -212,7 +230,12 @@ public:
     OrdersList(const OrdersList& other);    // copy constructor 
     ~OrdersList();                          // destructor 
 
-    OrdersList& operator=(const OrdersList& other); // assignment operator 
+    OrdersList& operator=(const OrdersList& other); // assignment operator
+
+    // Update the player and territory links in each copied order.
+    // Keep its description, saved effect, and record of whether it executed.
+    void rebindContext(const Player* original, Player* destination,
+                       const std::unordered_map<int, Territory*>& territories);
 
     friend std::ostream& operator<<(std::ostream& outs, const OrdersList& list); // friend operator 
 
