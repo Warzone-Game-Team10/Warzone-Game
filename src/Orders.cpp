@@ -1,5 +1,6 @@
 #include "Orders.h"
 #include <iostream>
+#include <memory>
 #include <string> 
 
 //==========================================================================================
@@ -78,6 +79,35 @@ Order& Order::operator=(const Order& other) {
 
 
 
+
+// Copy through the public interface without losing the dynamic order type.
+Order* Order::clone() const {
+    return new Order(*this);
+}
+
+Deploy* Deploy::clone() const {
+    return new Deploy(*this);
+}
+
+Advance* Advance::clone() const {
+    return new Advance(*this);
+}
+
+Bomb* Bomb::clone() const {
+    return new Bomb(*this);
+}
+
+Blockade* Blockade::clone() const {
+    return new Blockade(*this);
+}
+
+Airlift* Airlift::clone() const {
+    return new Airlift(*this);
+}
+
+Negotiate* Negotiate::clone() const {
+    return new Negotiate(*this);
+}
 
 // ------------------- VALIDATE +  EXECUTE METHODS  ------------------- 
 
@@ -434,18 +464,20 @@ OrdersList::OrdersList(){
 
 // copy constructor ( deep copy!! )
 OrdersList::OrdersList( const OrdersList& other){
-    if(this != &other){
-    // Loop through the other list, find every order pointer, 
-    // duplicate its text deeply, and add it to our new vector.
-    for (size_t i = 0; i < other.list.size(); ++i) {
-    if (other.list[i] != nullptr) {
-        // This copies the base instance reference safely without slicing object boundaries
-        list.push_back(new Order(*other.list[i])); 
+    try {
+        for (const Order* order : other.list) {
+            // Keep ownership until insertion succeeds, including allocation failures.
+            std::unique_ptr<Order> copy(order->clone());
+            list.push_back(nullptr);
+            list.back() = copy.release();
+        }
+    } catch (...) {
+        // A failed constructor does not run the OrdersList destructor.
+        for (Order* order : list) {
+            delete order;
+        }
+        throw;
     }
-}
-
-    }
-    
 }
 
 
@@ -465,20 +497,9 @@ OrdersList::~OrdersList() {
 // assignment operator 
 OrdersList& OrdersList::operator=(const OrdersList& other) {
     if (this != &other) {
-        // 1. clear out our own existing memory so we dont leak anything
-        for (size_t i = 0; i < list.size(); ++i) {
-            if (list[i] != nullptr) {
-                delete list[i];
-            }
-        }
-        list.clear();
-
-        // 2. perform a deep copy from the 'other' list
-        for (size_t i = 0; i < other.list.size(); ++i) {
-            if (other.list[i] != nullptr) {
-                list.push_back(new Order(*other.list[i]));
-            }
-        }
+        // Build the complete copy before replacing the destination's orders.
+        OrdersList replacement(other);
+        list.swap(replacement.list);
     }
     return *this;
 }
@@ -493,7 +514,13 @@ void OrdersList::addOrder(Order* newOrder) {
 }
 
 
-// REMOVING AN ORDER 
+// ACCESSING AN ORDER
+Order* OrdersList::getOrder(int index) {
+    return list.at(index);
+}
+
+
+// REMOVING AN ORDER
 void OrdersList::remove(int index) {
     // 1. Safety Guard: Check if the index is outside our list boundaries
     if (index < 0 || index >= static_cast<int>(list.size())) {

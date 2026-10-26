@@ -30,6 +30,9 @@ public:
     virtual bool validate();       // method which verifies if order is illegal 
     virtual void execute();        // method which executes the game action 
 
+    // Caller owns the copy; subclasses preserve their specific type and state.
+    virtual Order* clone() const;
+
 
 protected:
 
@@ -54,6 +57,8 @@ public:
 
     Deploy& operator=(const Deploy& other);  // assignment operator 
 
+    Deploy* clone() const override;
+
     bool validate() override;       
     void execute() override; 
 };
@@ -71,6 +76,8 @@ public:
 
     Advance& operator=(const Advance& other);
 
+    Advance* clone() const override;
+
     bool validate() override; 
     void execute() override; 
 };
@@ -87,6 +94,8 @@ public:
     ~Bomb() override; 
 
     Bomb& operator=(const Bomb& other);
+
+    Bomb* clone() const override;
 
     bool validate() override; 
     void execute() override; 
@@ -106,6 +115,8 @@ public:
 
     Blockade& operator=( const Blockade& other);
 
+    Blockade* clone() const override;
+
     bool validate() override; 
     void execute() override; 
 };
@@ -122,6 +133,8 @@ public:
 
     Airlift& operator=(const Airlift& other);
 
+    Airlift* clone() const override;
+
     bool validate() override;
     void execute() override;
 };
@@ -137,6 +150,8 @@ public:
     ~Negotiate() override; 
 
     Negotiate& operator= (const Negotiate& other);
+
+    Negotiate* clone() const override;
 
     bool validate() override; 
     void execute() override;
@@ -166,6 +181,9 @@ public:
     void addOrder(Order* newOrder );            // method gives players a way to put an order into that list, the function takes a pointer to an order
     void remove(int index);                     // method to delete an order 
     void move(int oldIndex, int newIndex);      // method to move an order
+
+    // Borrows an order without transferring ownership; throws std::out_of_range for an invalid index.
+    Order* getOrder(int index);
 
 
 private: 

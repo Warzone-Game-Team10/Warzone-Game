@@ -1,8 +1,115 @@
 #include "Orders.h"
 #include "OrdersDriver.h"
 #include <iostream>
+#include <memory>
+#include <sstream>
+#include <stdexcept>
+#include <typeinfo>
+
+namespace {
+
+// Fail the driver when a copy loses an order's type, state, or independence.
+void check(bool condition, const std::string& message) {
+    if (!condition) {
+        throw std::runtime_error("Orders copy check failed: " + message);
+    }
+}
+
+// Populate a list with every production subclass in a known order.
+void addAllOrderTypes(OrdersList& orders) {
+    orders.addOrder(new Deploy());
+    orders.addOrder(new Advance());
+    orders.addOrder(new Bomb());
+    orders.addOrder(new Blockade());
+    orders.addOrder(new Airlift());
+    orders.addOrder(new Negotiate());
+}
+
+// Copies must retain each subclass and description in independently owned objects.
+void checkCopies(OrdersList& original, OrdersList& copied, const std::string& operation) {
+    for (int index = 0; index < 6; ++index) {
+        Order* source = original.getOrder(index);
+        Order* copy = copied.getOrder(index);
+        check(typeid(*source) == typeid(*copy), operation + " preserves subclass at index " + std::to_string(index));
+        check(source != copy, operation + " creates a separate order at index " + std::to_string(index));
+        std::ostringstream sourceText, copyText;
+        sourceText << *source;
+        copyText << *copy;
+        check(sourceText.str() == copyText.str(), operation + " preserves description at index " + std::to_string(index));
+    }
+}
+
+// Give each subclass non-default text before copying, so a fresh default is not a valid copy.
+void testCopiesPreserveChangedDescriptions() {
+    OrdersList original;
+    addAllOrderTypes(original);
+    Order generic;
+    for (int index = 0; index < 6; ++index) {
+        *original.getOrder(index) = generic;
+    }
+
+    OrdersList copied(original);
+    checkCopies(original, copied, "Copy construction with changed descriptions");
+    OrdersList assigned;
+    assigned = original;
+    checkCopies(original, assigned, "Assignment with changed descriptions");
+}
+
+// Exercise both copying paths, replacement, self-assignment, and source destruction.
+void testOrderListCopies() {
+    OrdersList surviving;
+    std::unique_ptr<OrdersList> survivingCopy;
+    {
+        OrdersList original;
+        addAllOrderTypes(original);
+        OrdersList copied(original);
+        checkCopies(original, copied, "Copy construction");
+
+        OrdersList assigned;
+        assigned.addOrder(new Order());
+        assigned = original;
+        checkCopies(original, assigned, "Assignment");
+        Order* beforeSelfAssignment = assigned.getOrder(0);
+        const OrdersList& sameList = assigned;
+        assigned = sameList;
+        check(assigned.getOrder(0) == beforeSelfAssignment, "Self-assignment retains existing orders");
+        checkCopies(original, assigned, "Self-assignment");
+
+        std::ostringstream before, after, changed;
+        before << *original.getOrder(0);
+        Order generic;
+        *copied.getOrder(0) = generic;
+        after << *original.getOrder(0);
+        changed << *copied.getOrder(0);
+        check(before.str() == after.str() && changed.str() != after.str(),
+              "Changing a copied description leaves the original unchanged");
+        copied.remove(0);
+        check(dynamic_cast<Deploy*>(original.getOrder(0)) != nullptr,
+              "Removing a copied order leaves the original usable");
+
+        surviving = original;
+        survivingCopy = std::make_unique<OrdersList>(original);
+        OrdersList empty;
+        OrdersList emptyCopy(empty);
+        assigned = empty;
+        std::ostringstream emptyText, assignedText;
+        emptyText << emptyCopy;
+        assignedText << assigned;
+        check(emptyText.str() == assignedText.str(), "Assigning an empty list removes existing orders");
+    }
+
+    OrdersList expected;
+    addAllOrderTypes(expected);
+    checkCopies(expected, surviving, "Copy after source destruction");
+    checkCopies(expected, *survivingCopy, "Copy construction after source destruction");
+}
+
+}
 
 bool testOrders() {
+    testCopiesPreserveChangedDescriptions();
+    testOrderListCopies();
+    std::cout << "PASS: All order-copy regression tests passed.\n";
     std::cout << "==================================================" << std::endl;
     std::cout << "       COMP 345 - WARZONE ORDERS TESTING HARNESS  " << std::endl;
     std::cout << "==================================================" << std::endl << std::endl;
