@@ -294,9 +294,88 @@ void testTransferValidation() {
     checkExecution(airlift, false, "Airlift after source armies decrease");
 }
 
+// The queue owns each case; both list-copy paths must preserve its validation context.
+void checkInteractionCase(Order* order, bool valid, const std::string& label) {
+    OrdersList queued;
+    queued.addOrder(order);
+    OrdersList copied(queued);
+    OrdersList assigned;
+    assigned = queued;
+    for (OrdersList* list : {&queued, &copied, &assigned}) {
+        checkValidation(list->getOrder(0)->validate() == valid, label + " (including copies)");
+    }
+    checkExecution(*queued.getOrder(0), valid, label);
+}
+
+void testInteractionValidation() {
+    Territory isolated(20, "Isolated owned territory");
+    Territory border(21, "Border territory");
+    Territory target(22, "Adjacent opponent target");
+    Territory distant(23, "Distant opponent target");
+    Territory unowned(24, "Unowned target");
+    target.setArmyCount(8);
+    border.addAdjacentTerritory(&target);
+    border.addAdjacentTerritory(&unowned);
+    border.addAdjacentTerritory(&isolated);
+    Player issuer;
+    Player opponent;
+    issuer.addTerritory(&isolated);
+    issuer.addTerritory(&border);
+    opponent.addTerritory(&target);
+    opponent.addTerritory(&distant);
+    Territory* enemy = opponent.getTerritoryList().front();
+    Territory* farEnemy = opponent.getTerritoryList().back();
+    Territory* owned = issuer.getTerritoryList().front();
+    Territory ownedAlias(*owned);
+    ownedAlias.setOwner(&opponent);
+
+    // Adjacency comes from the second owned territory and matches the cloned target by ID.
+    checkInteractionCase(new Bomb(&issuer, enemy), true, "Bomb adjacent opponent target");
+    checkInteractionCase(new Bomb(), false, "Default Bomb");
+    checkInteractionCase(new Bomb(nullptr, enemy), false, "Bomb without issuer");
+    checkInteractionCase(new Bomb(&issuer, nullptr), false, "Bomb without target");
+    checkInteractionCase(new Bomb(&issuer, owned), false, "Bomb owned adjacent target");
+    checkInteractionCase(new Bomb(&issuer, &ownedAlias), false, "Bomb ownership uses territory collection IDs");
+    checkInteractionCase(new Bomb(&issuer, &unowned), false, "Bomb unowned adjacent target");
+    checkInteractionCase(new Bomb(&issuer, farEnemy), false, "Bomb distant opponent target");
+
+    // Default player names are equal; negotiation depends on identity, not names.
+    checkInteractionCase(new Negotiate(&issuer, &opponent), true, "Negotiate with another player");
+    checkInteractionCase(new Negotiate(), false, "Default Negotiate");
+    checkInteractionCase(new Negotiate(nullptr, &opponent), false, "Negotiate without issuer");
+    checkInteractionCase(new Negotiate(&issuer, nullptr), false, "Negotiate without partner");
+    checkInteractionCase(new Negotiate(&issuer, &issuer), false, "Negotiate with self");
+
+    Bomb bomb(&issuer, enemy);
+    Bomb bombCopy(bomb), bombAssigned;
+    bombAssigned = bomb;
+    Negotiate negotiate(&issuer, &opponent);
+    Negotiate negotiateCopy(negotiate), negotiateAssigned;
+    negotiateAssigned = negotiate;
+    checkValidation(bombCopy.validate() && bombAssigned.validate(), "Direct Bomb copies preserve valid context");
+    checkValidation(negotiateCopy.validate() && negotiateAssigned.validate(), "Direct Negotiate copies preserve valid context");
+    bombAssigned = Bomb(&opponent, enemy);
+    negotiateAssigned = Negotiate(&opponent, &opponent);
+    checkValidation(!bombAssigned.validate() && !negotiateAssigned.validate(), "Interaction assignment replaces issuer");
+    bombAssigned = Bomb(&issuer, farEnemy);
+    negotiateAssigned = Negotiate(&opponent, &issuer);
+    checkValidation(!bombAssigned.validate() && negotiateAssigned.validate(), "Interaction assignment replaces target or partner");
+
+    checkValidation(enemy->getArmyCount() == 8 && enemy->getOwner() == &opponent &&
+          issuer.getTerritoryList().size() == 2 && opponent.getTerritoryList().size() == 2,
+          "Interaction execution leaves armies and ownership unchanged");
+    // Removing the issuer's territories leaves the opponent target alive.
+    issuer.setTerritoryList({});
+    checkValidation(!bombCopy.validate(), "Bomb copies see current issuer territories");
+    checkExecution(bomb, false, "Bomb after losing adjacent territories");
+    checkValidation(negotiateCopy.validate(), "Negotiation does not require owned territories");
+}
+
 }
 
 bool testOrders() {
+    testInteractionValidation();
+    std::cout << "PASS: Bomb and Negotiate validation checks passed.\n";
     Advance incompleteAdvance;
     Airlift incompleteAirlift;
     checkValidation(!incompleteAdvance.validate(), "Default Advance lacks required context");

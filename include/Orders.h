@@ -105,6 +105,7 @@ class Bomb : public Order {
 public: 
 
     Bomb();
+    Bomb(Player* issuer, Territory* target);
     Bomb(const Bomb& other);
     ~Bomb() override; 
 
@@ -115,6 +116,10 @@ public:
     bool validate() override; 
     void execute() override; 
 
+private:
+    // Borrowed links: these objects must outlive the order and all its copies.
+    Player* issuer;
+    Territory* target;
 };
 
 
@@ -173,6 +178,7 @@ private:
 class Negotiate : public Order {
 public: 
     Negotiate();
+    Negotiate(Player* issuer, Player* partner);
     Negotiate(const Negotiate& other);
     ~Negotiate() override; 
 
@@ -182,6 +188,10 @@ public:
 
     bool validate() override; 
     void execute() override;
+private:
+    // Borrowed links: these players must outlive the order and all its copies.
+    Player* issuer;
+    Player* partner;
 };
 
 //========================================   ORDERS LIST CLASS   ============================================================

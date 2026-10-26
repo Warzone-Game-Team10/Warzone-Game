@@ -277,17 +277,19 @@ void Advance::execute() {
 
 // --------------- BOMB ORDER --------------- 
 
-// Default Constructor
-Bomb::Bomb() : Order() {
+// Default orders remain queueable, but lack the context needed for validation.
+Bomb::Bomb() : Bomb(nullptr, nullptr) {}
+
+Bomb::Bomb(Player* issuer, Territory* target)
+    : Order(), issuer(issuer), target(target) {
     *description = "Bomb Order"; 
 }
 
 
 
-// Copy Constructor
-Bomb::Bomb(const Bomb& other) : Order(other) {
-    // Handled safely by the parent deep copy setup
-}
+// Copy the description independently while preserving borrowed game-object links.
+Bomb::Bomb(const Bomb& other)
+    : Order(other), issuer(other.issuer), target(other.target) {}
 
 
 
@@ -299,7 +301,9 @@ Bomb::~Bomb() {
 // Assignment Operator
 Bomb& Bomb::operator=(const Bomb& other) {
     if (this != &other) {
-        Order::operator=(other); // Invokes parent scope assignment safety
+        Order::operator=(other);
+        issuer = other.issuer;
+        target = other.target;
     }
     return *this;
 }
@@ -308,8 +312,19 @@ Bomb& Bomb::operator=(const Bomb& other) {
 
 // Validation Method
 bool Bomb::validate() {
-    std::cout << "Validating Bomb order logic..." << std::endl;
-    return true; 
+    if (issuer == nullptr || target == nullptr || target->getOwner() == nullptr ||
+        target->getOwner() == issuer || issuer->ownsTerritory(target)) {
+        return false;
+    }
+    // Any owned territory may provide adjacency; IDs account for Player's territory copies.
+    for (Territory* territory : issuer->getTerritoryList()) {
+        for (Territory* neighbor : territory->getAdjacentTerritories()) {
+            if (neighbor != nullptr && neighbor->getId() == target->getId()) {
+                return true;
+            }
+        }
+    }
+    return false;
 }
 
 
@@ -318,6 +333,8 @@ bool Bomb::validate() {
 void Bomb::execute() {
     if (validate()) {
         std::cout << "Executing Action: Target territory bombed! Enemy forces halved!" << std::endl;
+    } else {
+        std::cout << "Bomb execution failed: invalid order." << std::endl;
     }
 }
 
@@ -446,16 +463,18 @@ void Airlift::execute() {
 // --------------- NEGOTIATE ORDER --------------- 
 
 
-// Default Constructor
-Negotiate::Negotiate() : Order() {
+// Default orders remain queueable, but lack the context needed for validation.
+Negotiate::Negotiate() : Negotiate(nullptr, nullptr) {}
+
+Negotiate::Negotiate(Player* issuer, Player* partner)
+    : Order(), issuer(issuer), partner(partner) {
     // We dereference our inherited pointer to assign our unique child text.
     *description = "Negotiate Order"; 
 }
 
-// Copy Constructor
-Negotiate::Negotiate(const Negotiate& other) : Order(other) {
-    // Handled safely by the parent deep copy setup
-}
+// Copy the description independently while preserving borrowed game-object links.
+Negotiate::Negotiate(const Negotiate& other)
+    : Order(other), issuer(other.issuer), partner(other.partner) {}
 
 // Destructor
 Negotiate::~Negotiate() {
@@ -465,21 +484,24 @@ Negotiate::~Negotiate() {
 // Assignment Operator
 Negotiate& Negotiate::operator=(const Negotiate& other) {
     if (this != &other) {
-        Order::operator=(other); // Invokes parent scope assignment safety
+        Order::operator=(other);
+        issuer = other.issuer;
+        partner = other.partner;
     }
     return *this;
 }
 
 // Validation Method
 bool Negotiate::validate() {
-    std::cout << "Validating Negotiate order logic..." << std::endl;
-    return true; // Baseline placeholder for Assignment 1 requirements
+    return issuer != nullptr && partner != nullptr && issuer != partner;
 }
 
 // Execution Method
 void Negotiate::execute() {
     if (validate()) {
         std::cout << "Executing Action: Peace agreement signed! Attacks prevented between players for this turn!" << std::endl;
+    } else {
+        std::cout << "Negotiate execution failed: invalid order." << std::endl;
     }
 }
 
