@@ -343,10 +343,12 @@ void testPlayerCopiesSurviveSource(bool assignment, bool ownedReferences) {
 // Make copying fail on purpose, then check that Bob still has his old data.
 class UncopyableOrder : public Order {
 public:
-    Order* clone() const override {
-        throw runtime_error("Deliberate order-copy failure");
-    }
+    Order* clone() const override;
 };
+
+Order* UncopyableOrder::clone() const {
+    throw runtime_error("Deliberate order-copy failure");
+}
 
 void testPlayerAssignmentFailurePreservesDestination() {
     Player alice;
