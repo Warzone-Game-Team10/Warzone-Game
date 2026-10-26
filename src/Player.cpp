@@ -17,7 +17,7 @@ Player::Player()
     : name("Unnamed"), territoryList(), cardHand(new Hand(nullptr)), ordersList(new OrdersList()) {}
 
  Player::Player(string playerName, Hand* cardHand, OrdersList* ordersList, vector<Territory*> territoryList)
- : name(playerName), cardHand(nullptr), territoryList(), ordersList(nullptr) {
+ : name(playerName), territoryList(), cardHand(nullptr), ordersList(nullptr) {
     
     this->name=playerName;
   

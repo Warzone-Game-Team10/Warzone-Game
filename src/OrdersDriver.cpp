@@ -201,7 +201,6 @@ void testOwnedTargetValidation() {
           issuer.getTerritoryList().size() == 1 && opponent.getTerritoryList().size() == 1,
           "Valid and invalid execution leave armies and ownership unchanged");
 
-    // Map targets stay alive as ownership changes; all copies must see current context.
     issuer.setTerritoryList({});
     for (OrdersList* list : {&queued, &copied, &assigned}) {
         checkValidation(!list->getOrder(0)->validate() && !list->getOrder(1)->validate(),
@@ -212,9 +211,100 @@ void testOwnedTargetValidation() {
     checkValidation(!deployCopy.validate() && !blockadeCopy.validate(), "Direct copies revalidate borrowed context");
 }
 
+// Queue both transfer types, then verify validation survives both list-copy paths.
+void checkTransferCase(Player* issuer, Territory* source, Territory* target, int amount,
+                       bool advanceValid, bool airliftValid, const std::string& label) {
+    OrdersList queued;
+    queued.addOrder(new Advance(issuer, source, target, amount));
+    queued.addOrder(new Airlift(issuer, source, target, amount));
+    OrdersList copied(queued);
+    OrdersList assigned;
+    assigned = queued;
+    for (OrdersList* list : {&queued, &copied, &assigned}) {
+        checkValidation(list->getOrder(0)->validate() == advanceValid, label + " (Advance, including copies)");
+        checkValidation(list->getOrder(1)->validate() == airliftValid, label + " (Airlift, including copies)");
+    }
+    checkExecution(*queued.getOrder(0), advanceValid, label + " (Advance)");
+    checkExecution(*queued.getOrder(1), airliftValid, label + " (Airlift)");
+}
+
+void testTransferValidation() {
+    Territory source(10, "Source");
+    Territory nearby(11, "Nearby target");
+    Territory distant(12, "Distant opponent target");
+    source.setArmyCount(5);
+    nearby.setArmyCount(2);
+    distant.setArmyCount(8);
+    source.addAdjacentTerritory(&nearby);
+    Player issuer;
+    Player opponent;
+    issuer.addTerritory(&source);
+    opponent.addTerritory(&distant);
+    Territory* owned = issuer.getTerritoryList().front();
+    Territory* enemy = opponent.getTerritoryList().front();
+    Territory sameSource(*owned);
+    Territory sameNeighbor(nearby);
+
+    checkTransferCase(&issuer, owned, &nearby, 1, true, true, "Positive amount to adjacent target");
+    checkTransferCase(&issuer, owned, &nearby, 5, true, true, "Exact available armies");
+    checkTransferCase(nullptr, owned, &nearby, 1, false, false, "Missing issuer");
+    checkTransferCase(&issuer, nullptr, &nearby, 1, false, false, "Missing source");
+    checkTransferCase(&issuer, owned, nullptr, 1, false, false, "Missing target");
+    checkTransferCase(&opponent, owned, &nearby, 1, false, false, "Source not owned by issuer");
+    checkTransferCase(&issuer, owned, owned, 1, false, false, "Identical source and target");
+    checkTransferCase(&issuer, owned, &sameSource, 1, false, false, "Same territory ID in different objects");
+    checkTransferCase(&issuer, owned, &nearby, 0, false, false, "Zero transfer amount");
+    checkTransferCase(&issuer, owned, &nearby, -1, false, false, "Negative transfer amount");
+    checkTransferCase(&issuer, owned, &nearby, 6, false, false, "More than available armies");
+    checkTransferCase(&issuer, owned, enemy, 1, false, true, "Distant opponent target");
+    checkTransferCase(&issuer, owned, &sameNeighbor, 1, true, true, "Adjacent target recognized by ID");
+    owned->addAdjacentTerritory(enemy);
+    checkTransferCase(&issuer, owned, enemy, 1, true, true, "Adjacent opponent target");
+
+    // Copying keeps borrowed context; assignment must replace all transfer fields.
+    Advance advance(&issuer, owned, &nearby, 5);
+    Airlift airlift(&issuer, owned, enemy, 5);
+    Advance advanceCopy(advance), advanceAssigned;
+    Airlift airliftCopy(airlift), airliftAssigned;
+    advanceAssigned = advance;
+    airliftAssigned = airlift;
+    checkValidation(advanceCopy.validate() && advanceAssigned.validate(), "Direct Advance copies preserve valid context");
+    checkValidation(airliftCopy.validate() && airliftAssigned.validate(), "Direct Airlift copies preserve valid context");
+    advanceAssigned = Advance(&opponent, owned, &nearby, 5);
+    airliftAssigned = Airlift(&opponent, owned, enemy, 5);
+    checkValidation(!advanceAssigned.validate() && !airliftAssigned.validate(), "Transfer assignment replaces issuer");
+    advanceAssigned = Advance(&issuer, enemy, &nearby, 1);
+    airliftAssigned = Airlift(&issuer, enemy, &nearby, 1);
+    checkValidation(!advanceAssigned.validate() && !airliftAssigned.validate(), "Transfer assignment replaces source");
+    advanceAssigned = Advance(&issuer, owned, owned, 1);
+    airliftAssigned = Airlift(&issuer, owned, owned, 1);
+    checkValidation(!advanceAssigned.validate() && !airliftAssigned.validate(), "Transfer assignment replaces target");
+    advanceAssigned = Advance(&issuer, owned, &nearby, 0);
+    airliftAssigned = Airlift(&issuer, owned, enemy, 0);
+    checkValidation(!advanceAssigned.validate() && !airliftAssigned.validate(), "Transfer assignment replaces amount");
+
+    checkValidation(owned->getArmyCount() == 5 && owned->getOwner() == &issuer &&
+          nearby.getArmyCount() == 2 && nearby.getOwner() == nullptr &&
+          enemy->getArmyCount() == 8 && enemy->getOwner() == &opponent &&
+          issuer.getTerritoryList().size() == 1 && opponent.getTerritoryList().size() == 1,
+          "Transfer execution leaves armies and ownership unchanged");
+    owned->setArmyCount(4);
+    checkValidation(!advanceCopy.validate() && !airliftCopy.validate(), "Copies see current source armies");
+    checkExecution(advance, false, "Advance after source armies decrease");
+    checkExecution(airlift, false, "Airlift after source armies decrease");
+}
+
 }
 
 bool testOrders() {
+    Advance incompleteAdvance;
+    Airlift incompleteAirlift;
+    checkValidation(!incompleteAdvance.validate(), "Default Advance lacks required context");
+    checkValidation(!incompleteAirlift.validate(), "Default Airlift lacks required context");
+    checkExecution(incompleteAdvance, false, "Default Advance");
+    checkExecution(incompleteAirlift, false, "Default Airlift");
+    testTransferValidation();
+    std::cout << "PASS: Advance and Airlift validation checks passed.\n";
     Order generic;
     checkValidation(!generic.validate(), "Generic order is invalid");
     checkExecution(generic, false, "Generic order");

@@ -79,6 +79,7 @@ class Advance : public Order {
 public: 
 
     Advance();
+    Advance(Player* issuer, Territory* source, Territory* target, int armyCount);
     Advance(const Advance& other);
     ~Advance() override; 
 
@@ -88,6 +89,12 @@ public:
 
     bool validate() override; 
     void execute() override; 
+private:
+    // Borrowed links: these objects must outlive the order and all its copies.
+    Player* issuer;
+    Territory* source;
+    Territory* target;
+    int armyCount;
 };
 
 
@@ -141,6 +148,7 @@ private:
 class Airlift : public Order {
 public: 
     Airlift();
+    Airlift(Player* issuer, Territory* source, Territory* target, int armyCount);
     Airlift(const Airlift& other);
     ~Airlift() override; 
 
@@ -150,6 +158,12 @@ public:
 
     bool validate() override;
     void execute() override;
+private:
+    // Borrowed links: these objects must outlive the order and all its copies.
+    Player* issuer;
+    Territory* source;
+    Territory* target;
+    int armyCount;
 };
 
 

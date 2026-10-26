@@ -212,14 +212,18 @@ void Deploy::execute() {
 
 // --------------- ADVANCE ORDER --------------- 
 
-// Default Constructor
-Advance::Advance() : Order() {
+// Default orders remain queueable
+Advance::Advance() : Advance(nullptr, nullptr, nullptr, 0) {}
+
+Advance::Advance(Player* issuer, Territory* source, Territory* target, int armyCount)
+    : Order(), issuer(issuer), source(source), target(target), armyCount(armyCount) {
     *description = "Advance Order"; 
 }
 
 
-// Copy Constructor
-Advance::Advance(const Advance& other) : Order(other) {}
+// Copy the description independently while preserving borrowed game-object links.
+Advance::Advance(const Advance& other)
+    : Order(other), issuer(other.issuer), source(other.source), target(other.target), armyCount(other.armyCount) {}
 
 
 // Destructor
@@ -230,6 +234,10 @@ Advance::~Advance() {}
 Advance& Advance::operator=(const Advance& other) {
     if (this != &other) {
         Order::operator=(other);
+        issuer = other.issuer;
+        source = other.source;
+        target = other.target;
+        armyCount = other.armyCount;
     }
     return *this;
 }
@@ -237,8 +245,18 @@ Advance& Advance::operator=(const Advance& other) {
 
 // Validation Method
 bool Advance::validate() {
-    std::cout << "Validating Advance order logic..." << std::endl;
-    return true; 
+    if (issuer == nullptr || source == nullptr || target == nullptr ||
+        !issuer->ownsTerritory(source) || source->getId() == target->getId() ||
+        armyCount <= 0 || armyCount > source->getArmyCount()) {
+        return false;
+    }
+    // Player clones territories, so compare IDs
+    for (Territory* neighbor : source->getAdjacentTerritories()) {
+        if (neighbor != nullptr && neighbor->getId() == target->getId()) {
+            return true;
+        }
+    }
+    return false;
 }
 
 
@@ -246,6 +264,8 @@ bool Advance::validate() {
 void Advance::execute() {
     if (validate()) {
         std::cout << "Executing Action: Troops advanced across territories!" << std::endl;
+    } else {
+        std::cout << "Advance execution failed: invalid order." << std::endl;
     }
 }
 
@@ -367,16 +387,19 @@ void Blockade::execute() {
 
 // ---------------  AIRLIFT ORDER --------------- 
 
-// Default Constructor
-Airlift::Airlift() : Order() {
+// Default orders remain queueable, but lack the context needed for validation.
+Airlift::Airlift() : Airlift(nullptr, nullptr, nullptr, 0) {}
+
+Airlift::Airlift(Player* issuer, Territory* source, Territory* target, int armyCount)
+    : Order(), issuer(issuer), source(source), target(target), armyCount(armyCount) {
     // We dereference our inherited pointer to assign our unique child text.
     *description = "Airlift Order"; 
 }
 
 
-// Copy Constructor
-Airlift::Airlift(const Airlift& other) : Order(other) {
-}
+// Copy the description independently while preserving borrowed game-object links.
+Airlift::Airlift(const Airlift& other)
+    : Order(other), issuer(other.issuer), source(other.source), target(other.target), armyCount(other.armyCount) {}
 
 
 // Destructor
@@ -387,7 +410,11 @@ Airlift::~Airlift() {
 // Assignment Operator
 Airlift& Airlift::operator=(const Airlift& other) {
     if (this != &other) {
-        Order::operator=(other); 
+        Order::operator=(other);
+        issuer = other.issuer;
+        source = other.source;
+        target = other.target;
+        armyCount = other.armyCount;
     }
     return *this;
 }
@@ -395,8 +422,9 @@ Airlift& Airlift::operator=(const Airlift& other) {
 
 // Validation Method
 bool Airlift::validate() {
-    std::cout << "Validating Airlift order logic..." << std::endl;
-    return true; 
+    return issuer != nullptr && source != nullptr && target != nullptr &&
+           issuer->ownsTerritory(source) && source->getId() != target->getId() &&
+           armyCount > 0 && armyCount <= source->getArmyCount();
 }
 
 
@@ -404,6 +432,8 @@ bool Airlift::validate() {
 void Airlift::execute() {
     if (validate()) {
         std::cout << "Executing Action: Troops airlifted to a distant territory!" << std::endl;
+    } else {
+        std::cout << "Airlift execution failed: invalid order." << std::endl;
     }
 }
 
