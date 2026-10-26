@@ -2,6 +2,9 @@
 #include <vector>
 #include <string>
 #include <iostream>
+#include <memory>
+#include <unordered_map>
+#include <utility>
 
 #include "Player.h"
 #include "Cards.h"
@@ -17,7 +20,7 @@ Player::Player()
     : name("Unnamed"), territoryList(), cardHand(new Hand(nullptr)), ordersList(new OrdersList()) {}
 
  Player::Player(string playerName, Hand* cardHand, OrdersList* ordersList, vector<Territory*> territoryList)
- : name(playerName), cardHand(nullptr), territoryList(), ordersList(nullptr) {
+ : name(playerName), territoryList(), cardHand(nullptr), ordersList(nullptr) {
     
     this->name=playerName;
   
@@ -44,41 +47,62 @@ Player::Player()
 } 
 
 //copy constructor (deep copy)
-Player::Player(const Player& p){
-    this->name= p.name;
-    this->cardHand = new Hand(*(p.cardHand));
-    this->ordersList = new OrdersList(*(p.ordersList));
+Player::Player(const Player& original) : Player(original, this) {}
 
-     // deep copy of each territory
-    int count = p.territoryList.size();
-    for (int i = 0; i < count; i++) {
-        addTerritory(p.territoryList[i]);        
+// Assignment can prepare the copies before giving them to the destination player.
+Player::Player(const Player& original, Player* destination)
+    : name(original.name), territoryList(), cardHand(nullptr), ordersList(nullptr) {
+    // These temporary copies clean themselves up if any step fails.
+    // Store them here only after the whole copy is ready.
+    auto handCopy = std::make_unique<Hand>(*original.cardHand);
+    auto ordersCopy = std::make_unique<OrdersList>(*original.ordersList);
+    std::vector<std::unique_ptr<Territory>> ownedCopies;
+    std::unordered_map<int, Territory*> territoryCopies;
+    ownedCopies.reserve(original.territoryList.size());
+    territoryList.reserve(original.territoryList.size());
+    for (const Territory* territory : original.territoryList) {
+        auto copy = std::make_unique<Territory>(*territory);
+        copy->setOwner(destination);
+        territoryCopies.emplace(territory->getId(), copy.get());
+        territoryList.push_back(copy.get());
+        ownedCopies.push_back(std::move(copy));
+    }
+
+    // Copy every territory first, then connect the copies to their neighbours.
+    // For example, copied Ontario should point to copied Quebec.
+    for (const auto& territory : ownedCopies) {
+        std::vector<Territory*> neighbours = territory->getAdjacentTerritories();
+        for (Territory*& neighbour : neighbours) {
+            if (neighbour != nullptr) {
+                const auto found = territoryCopies.find(neighbour->getId());
+                if (found != territoryCopies.end()) {
+                    neighbour = found->second;
+                }
+            }
+        }
+        territory->setAdjacentTerritories(std::move(neighbours));
+    }
+    ordersCopy->rebindContext(&original, destination, territoryCopies);
+
+    cardHand = handCopy.release();
+    ordersList = ordersCopy.release();
+    for (std::size_t index = 0; index < ownedCopies.size(); ++index) {
+        territoryList[index] = ownedCopies[index].release();
     }
 }
 
 //assignment operator
 Player& Player::operator=(const Player& other) {
-   
     if (this != &other) {
-        // Free what we currently own.
-        delete cardHand;
-        delete ordersList;
-        deleteAllTerritories();
- 
-        // Step 2: deep copy from the other player.
-        name = other.name;
-        cardHand = new Hand(*(other.cardHand));
-        ordersList = new OrdersList(*(other.ordersList));
-        
-        //deep copy territories
-        int count = other.territoryList.size();
-        for (int i = 0; i < count; i++) {
-            addTerritory(other.territoryList[i]);
-        }
+        // Finish making the new copy before replacing this player's current data.
+        Player replacement(other, this);
+        name.swap(replacement.name);
+        territoryList.swap(replacement.territoryList);
+        std::swap(cardHand, replacement.cardHand);
+        std::swap(ordersList, replacement.ordersList);
+        // The temporary player now holds the old data and deletes it when this function ends.
     }
-
-    //return the current ("this") 
-    return *this; 
+    return *this;
 }
 
 //destructor

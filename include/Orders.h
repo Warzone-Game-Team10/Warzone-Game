@@ -7,7 +7,10 @@
 #include <iostream>  // will allow us to print text to the console 
 #include <vector> 
 #include <string>
+#include <unordered_map>
 
+class Player;
+class Territory;
 
 //============================= Blueprint for the (parent) Order class =============================
 
@@ -30,14 +33,27 @@ public:
     virtual bool validate();       // method which verifies if order is illegal 
     virtual void execute();        // method which executes the game action 
 
+    // Caller owns the copy; subclasses preserve their specific type and state.
+    virtual Order* clone() const;
+
+    // When copying a player, point this order to the new player and territory copies.
+    // Copying only the order keeps its links to the original players and territories.
+    virtual void rebindContext(const Player* original, Player* destination,
+                              const std::unordered_map<int, Territory*>& territories);
+
 
 protected:
 
     // a pointer to a string that would hold the order's description 
     std::string* description; 
 
+    // Every attempt discards the old result and checks the current game context.
+    bool validateExecution();
+    void recordEffect(const std::string& action);
 
-
+private:
+    std::string* effect;
+    bool executed;
 };
 
 //============================= 6 SUBLCASSES (DIFFERENT ORDERS)  =============================
@@ -49,13 +65,23 @@ class Deploy : public Order {
 public: 
 
     Deploy();                       // Default Constructor 
+    Deploy(Player* issuer, Territory* target, int armyCount);
     Deploy(const Deploy& other);    // Copy constructor 
     ~Deploy() override;             // Destructor 
 
     Deploy& operator=(const Deploy& other);  // assignment operator 
 
+    Deploy* clone() const override;
+    void rebindContext(const Player* original, Player* destination,
+                       const std::unordered_map<int, Territory*>& territories) override;
+
     bool validate() override;       
     void execute() override; 
+private:
+    // Borrowed links: these objects must outlive the order and all its copies.
+    Player* issuer;
+    Territory* target;
+    int armyCount;
 };
 
 
@@ -66,13 +92,24 @@ class Advance : public Order {
 public: 
 
     Advance();
+    Advance(Player* issuer, Territory* source, Territory* target, int armyCount);
     Advance(const Advance& other);
     ~Advance() override; 
 
     Advance& operator=(const Advance& other);
 
+    Advance* clone() const override;
+    void rebindContext(const Player* original, Player* destination,
+                       const std::unordered_map<int, Territory*>& territories) override;
+
     bool validate() override; 
     void execute() override; 
+private:
+    // Borrowed links: these objects must outlive the order and all its copies.
+    Player* issuer;
+    Territory* source;
+    Territory* target;
+    int armyCount;
 };
 
 
@@ -83,14 +120,23 @@ class Bomb : public Order {
 public: 
 
     Bomb();
+    Bomb(Player* issuer, Territory* target);
     Bomb(const Bomb& other);
     ~Bomb() override; 
 
     Bomb& operator=(const Bomb& other);
 
+    Bomb* clone() const override;
+    void rebindContext(const Player* original, Player* destination,
+                       const std::unordered_map<int, Territory*>& territories) override;
+
     bool validate() override; 
     void execute() override; 
 
+private:
+    // Borrowed links: these objects must outlive the order and all its copies.
+    Player* issuer;
+    Territory* target;
 };
 
 
@@ -101,13 +147,22 @@ class Blockade : public Order {
 public: 
 
     Blockade();
+    Blockade(Player* issuer, Territory* target);
     Blockade(const Blockade& other);
     ~Blockade() override;
 
     Blockade& operator=( const Blockade& other);
 
+    Blockade* clone() const override;
+    void rebindContext(const Player* original, Player* destination,
+                       const std::unordered_map<int, Territory*>& territories) override;
+
     bool validate() override; 
     void execute() override; 
+private:
+    // Borrowed links: these objects must outlive the order and all its copies.
+    Player* issuer;
+    Territory* target;
 };
 
 
@@ -117,13 +172,24 @@ public:
 class Airlift : public Order {
 public: 
     Airlift();
+    Airlift(Player* issuer, Territory* source, Territory* target, int armyCount);
     Airlift(const Airlift& other);
     ~Airlift() override; 
 
     Airlift& operator=(const Airlift& other);
 
+    Airlift* clone() const override;
+    void rebindContext(const Player* original, Player* destination,
+                       const std::unordered_map<int, Territory*>& territories) override;
+
     bool validate() override;
     void execute() override;
+private:
+    // Borrowed links: these objects must outlive the order and all its copies.
+    Player* issuer;
+    Territory* source;
+    Territory* target;
+    int armyCount;
 };
 
 
@@ -133,13 +199,22 @@ public:
 class Negotiate : public Order {
 public: 
     Negotiate();
+    Negotiate(Player* issuer, Player* partner);
     Negotiate(const Negotiate& other);
     ~Negotiate() override; 
 
     Negotiate& operator= (const Negotiate& other);
 
+    Negotiate* clone() const override;
+    void rebindContext(const Player* original, Player* destination,
+                       const std::unordered_map<int, Territory*>& territories) override;
+
     bool validate() override; 
     void execute() override;
+private:
+    // Borrowed links: these players must outlive the order and all its copies.
+    Player* issuer;
+    Player* partner;
 };
 
 //========================================   ORDERS LIST CLASS   ============================================================
@@ -155,7 +230,12 @@ public:
     OrdersList(const OrdersList& other);    // copy constructor 
     ~OrdersList();                          // destructor 
 
-    OrdersList& operator=(const OrdersList& other); // assignment operator 
+    OrdersList& operator=(const OrdersList& other); // assignment operator
+
+    // Update the player and territory links in each copied order.
+    // Keep its description, saved effect, and record of whether it executed.
+    void rebindContext(const Player* original, Player* destination,
+                       const std::unordered_map<int, Territory*>& territories);
 
     friend std::ostream& operator<<(std::ostream& outs, const OrdersList& list); // friend operator 
 
@@ -166,6 +246,9 @@ public:
     void addOrder(Order* newOrder );            // method gives players a way to put an order into that list, the function takes a pointer to an order
     void remove(int index);                     // method to delete an order 
     void move(int oldIndex, int newIndex);      // method to move an order
+
+    // Borrows an order without transferring ownership; throws std::out_of_range for an invalid index.
+    Order* getOrder(int index);
 
 
 private: 
