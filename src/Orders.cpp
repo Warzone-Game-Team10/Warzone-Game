@@ -1,4 +1,5 @@
 #include "Orders.h"
+#include "Player.h"
 #include <iostream>
 #include <memory>
 #include <string> 
@@ -114,9 +115,8 @@ Negotiate* Negotiate::clone() const {
 //VALIDATE METHOD : 
 
 bool Order::validate(){
-    //since its a generic order, we'll just return true...
-    std::cout << " Validating generic order " << std::endl;
-    return true;
+    // A generic order has no specific action whose requirements can be checked.
+    return false;
 
 }
 
@@ -150,18 +150,19 @@ void Order::execute(){
 
 // --------------- DEPLOY ORDER -----------------
 
-// default constructor 
-Deploy::Deploy() : Order() {
+// Keep existing callers working; an order without context can be queued but is invalid.
+Deploy::Deploy() : Deploy(nullptr, nullptr, 0) {}
+
+Deploy::Deploy(Player* issuer, Territory* target, int armyCount)
+    : Order(), issuer(issuer), target(target), armyCount(armyCount) {
     // We reuse the parent class constructor to set up a specific description
     *description = "Deploy Order";
 }
 
 
-// copy constructor (deep copy)
-Deploy::Deploy( const Deploy& other): Order(other){
-    // Since Deploy doesn't have any extra local pointer fields of its own yet, we can safely leave it as empty
-    // and let the parent class handle the deep copying
-}
+// Deep-copy the description, but keep references to the same player and target.
+Deploy::Deploy(const Deploy& other)
+    : Order(other), issuer(other.issuer), target(other.target), armyCount(other.armyCount) {}
 
 
 // Destructor 
@@ -179,6 +180,9 @@ Deploy& Deploy::operator=(const Deploy& other){
         // We call the parent's assignment operator to safely wipe out our old 
         // string allocation and deep-copy other's string allocation.
         Order::operator=(other);
+        issuer = other.issuer;
+        target = other.target;
+        armyCount = other.armyCount;
     }
     return *this;
 } 
@@ -186,8 +190,8 @@ Deploy& Deploy::operator=(const Deploy& other){
 
 // Validate
 bool Deploy::validate() {
-    std::cout << "Validating Deploy order logic..." << std::endl;
-    return true; 
+    // Use Player's collection-based ownership rules.
+    return issuer != nullptr && target != nullptr && armyCount > 0 && issuer->ownsTerritory(target);
 }
 
 
@@ -195,6 +199,8 @@ bool Deploy::validate() {
 void Deploy::execute() {
     if (validate()) {
         std::cout << "Executing action: Troops deployed successfully!" << std::endl;
+    } else {
+        std::cout << "Deploy execution failed: invalid order." << std::endl;
     }
 }
 
@@ -303,18 +309,19 @@ void Bomb::execute() {
 
 // --------------- BLOCKADE ORDER --------------- 
 
-// Default Constructor
-Blockade::Blockade() : Order() {
+// Keep existing callers working; an order without context can be queued but is invalid.
+Blockade::Blockade() : Blockade(nullptr, nullptr) {}
+
+Blockade::Blockade(Player* issuer, Territory* target)
+    : Order(), issuer(issuer), target(target) {
     // we dereference our inherited pointer to assign our unique child text.
     *description = "Blockade Order"; 
 }
 
 
-// Copy Constructor
-Blockade::Blockade(const Blockade& other) : Order(other) {
-    // By passing 'other' up to : Order(other), the parent class takes care 
-    // of allocating a brand-new slot on the heap and duplicating the text safely.
-}
+// Deep-copy the description, but keep references to the same player and target.
+Blockade::Blockade(const Blockade& other)
+    : Order(other), issuer(other.issuer), target(other.target) {}
 
 
 // destructor
@@ -330,6 +337,8 @@ Blockade& Blockade::operator=(const Blockade& other) {
         // 2. we reuse the parent class assignment logic to safely wipe out
         //    our current heap text and perform a clean deep-copy of 'other'.
         Order::operator=(other);
+        issuer = other.issuer;
+        target = other.target;
     }
     return *this;
 }
@@ -337,16 +346,18 @@ Blockade& Blockade::operator=(const Blockade& other) {
 
 // validation Method
 bool Blockade::validate() {
-    std::cout << "Validating Blockade order logic..." << std::endl;
-    return true; 
+    // Use the same collection-based ownership rules as Player.
+    return issuer != nullptr && target != nullptr && issuer->ownsTerritory(target);
 }
 
 
 // Execution Method
 void Blockade::execute() {
-    // execute() must call validate() first
+    // Recheck current ownership on every attempt.
     if (validate()) {
         std::cout << "Executing Action: Territory blockaded! Friendly troops doubled, territory turned neutral!" << std::endl;
+    } else {
+        std::cout << "Blockade execution failed: invalid order." << std::endl;
     }
 }
 

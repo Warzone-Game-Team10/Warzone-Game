@@ -8,6 +8,8 @@
 #include <vector> 
 #include <string>
 
+class Player;
+class Territory;
 
 //============================= Blueprint for the (parent) Order class =============================
 
@@ -52,6 +54,7 @@ class Deploy : public Order {
 public: 
 
     Deploy();                       // Default Constructor 
+    Deploy(Player* issuer, Territory* target, int armyCount);
     Deploy(const Deploy& other);    // Copy constructor 
     ~Deploy() override;             // Destructor 
 
@@ -61,6 +64,11 @@ public:
 
     bool validate() override;       
     void execute() override; 
+private:
+    // Borrowed links: these objects must outlive the order and all its copies.
+    Player* issuer;
+    Territory* target;
+    int armyCount;
 };
 
 
@@ -110,6 +118,7 @@ class Blockade : public Order {
 public: 
 
     Blockade();
+    Blockade(Player* issuer, Territory* target);
     Blockade(const Blockade& other);
     ~Blockade() override;
 
@@ -119,6 +128,10 @@ public:
 
     bool validate() override; 
     void execute() override; 
+private:
+    // Borrowed links: these objects must outlive the order and all its copies.
+    Player* issuer;
+    Territory* target;
 };
 
 
