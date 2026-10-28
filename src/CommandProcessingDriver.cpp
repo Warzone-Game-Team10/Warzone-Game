@@ -6,6 +6,9 @@
 #include <iostream>
 #include <sstream>
 #include <stdexcept>
+#include <chrono>
+#include <filesystem>
+#include <fstream>
 
 namespace {
 void check(bool condition, const std::string& message) {
@@ -240,9 +243,198 @@ void testCommandValidation() {
     testReadingAfterCommandRejection();
     std::cout << "PASS: Command syntax, state validation, and rejection checks.\n";
 }
+
+struct CommandFileFixture {
+    std::filesystem::path directory;
+    std::filesystem::path file;
+    explicit CommandFileFixture(const std::string& contents);
+    ~CommandFileFixture();
+};
+
+CommandFileFixture::CommandFileFixture(const std::string& contents) {
+    directory = std::filesystem::temp_directory_path() /
+                ("warzone-commands-" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
+    check(std::filesystem::create_directory(directory), "create isolated command fixture directory");
+    file = directory / "commands.txt";
+    std::ofstream output(file, std::ios::binary);
+    output << contents;
+    output.close();
+    if (!output) {
+        std::filesystem::remove_all(directory);
+        throw std::runtime_error("Cannot write command fixture.");
+    }
+}
+
+CommandFileFixture::~CommandFileFixture() {
+    std::error_code error;
+    std::filesystem::remove_all(directory, error);
+}
+
+void testFileReaderLinesAndCopies() {
+    CommandFileFixture fixture("first\n\nlast");
+    FileLineReader reader(fixture.file.string());
+    std::string line;
+    check(reader.readLineFromFile(line) && line == "first", "file starts at first line");
+    FileLineReader copied(reader);
+    FileLineReader assigned(fixture.file.string());
+    assigned = reader;
+    const FileLineReader& same = assigned;
+    assigned = same;
+    check(reader.readLineFromFile(line) && line.empty(), "blank file line retained");
+    check(reader.readLineFromFile(line) && line == "last", "last line without newline retained");
+    FileLineReader finalLineCopy(reader);
+    check(!finalLineCopy.readLineFromFile(line), "copy after unterminated last line preserves EOF");
+    check(!reader.readLineFromFile(line) && !reader.readLineFromFile(line), "repeated file EOF");
+    FileLineReader exhausted(reader);
+    check(!exhausted.readLineFromFile(line), "exhausted copy stays exhausted");
+    for (FileLineReader* independent : {&copied, &assigned}) {
+        check(independent->readLineFromFile(line) && line.empty(), "copy has independent same-position cursor");
+        check(independent->readLineFromFile(line) && line == "last", "copy retains remaining order");
+    }
+    std::ostringstream output;
+    output << reader;
+    check(output.str().find("commands.txt") != std::string::npos, "reader stream output identifies file");
+    CommandFileFixture empty("");
+    FileLineReader emptyReader(empty.file.string());
+    check(!emptyReader.readLineFromFile(line), "empty file immediately exhausts");
+    CommandFileFixture terminated("first\nsecond\n");
+    FileLineReader terminatedReader(terminated.file.string());
+    check(terminatedReader.readLineFromFile(line) && line == "first", "newline-terminated input");
+    {
+        FileLineReader temporary(terminatedReader);
+        assigned = temporary;
+    }
+    check(assigned.readLineFromFile(line) && line == "second", "assigned reader survives source destruction");
+    check(!assigned.readLineFromFile(line), "trailing newline creates no extra line");
+}
+
+void testFileAdapterMatchesConsole() {
+    const std::string text = "\nloadmap\nloadmap my map.map\nquit\nvalidatemap\naddplayer Alice Smith\ngamestart";
+    CommandFileFixture fixture(text);
+    FileCommandProcessorAdapter file(fixture.file.string());
+    std::istringstream input(text);
+    CommandProcessor console(input);
+    GameEngine fileEngine;
+    GameEngine consoleEngine;
+    std::ostringstream fileOutput;
+    std::ostringstream consoleOutput;
+    runCommandTransitions(fileEngine, file, fileOutput);
+    runCommandTransitions(consoleEngine, console, consoleOutput);
+    check(fileOutput.str() == consoleOutput.str() && fileEngine.getCurrentStateName() == "assign reinforcement",
+          "console and file share validation, effects, transitions, and EOF");
+    check(file.getCommandCount() == 7, "file history retains accepted and rejected lines");
+    for (std::size_t i = 0; i < file.getCommandCount(); ++i) {
+        check(file.getSavedCommand(i)->getText() == console.getSavedCommand(i)->getText() &&
+              file.getSavedCommand(i)->getEffect() == console.getSavedCommand(i)->getEffect(),
+              "console and file histories agree");
+    }
+    FileCommandProcessorAdapter exhausted(file);
+    check(!exhausted.getCommand(), "adapter copy preserves EOF");
+}
+
+void testFileAdapterCopies() {
+    CommandFileFixture fixture("\nloadmap\nloadmap my map.map\n");
+    FileCommandProcessorAdapter source(fixture.file.string());
+    source.getCommand()->saveEffect("saved effect");
+    FileCommandProcessorAdapter copied(source);
+    FileCommandProcessorAdapter assigned(fixture.file.string());
+    assigned.getCommand();
+    assigned.getCommand();
+    assigned = source;
+    const FileCommandProcessorAdapter& same = assigned;
+    assigned = same;
+    copied.getSavedCommand(0)->saveEffect("copy effect");
+    check(source.getSavedCommand(0)->getEffect() == "saved effect" &&
+          assigned.getSavedCommand(0)->getEffect() == "saved effect" &&
+          copied.getSavedCommand(0) != source.getSavedCommand(0), "adapter histories and effects are independent");
+    check(source.getCommand()->getText() == "loadmap", "source reads its next command");
+    check(source.getCommand()->getText() == "loadmap my map.map", "source advances independently");
+    check(copied.getCommand()->getText() == "loadmap", "constructed copy retains its own cursor");
+    check(assigned.getCommand()->getText() == "loadmap", "assigned copy retains its own cursor");
+    {
+        FileCommandProcessorAdapter temporary(fixture.file.string());
+        temporary.getCommand();
+        assigned = temporary;
+    }
+    check(assigned.getCommand()->getText() == "loadmap", "assigned adapter survives source destruction");
+    std::ostringstream output;
+    output << copied;
+    check(output.str().find("commands.txt") != std::string::npos &&
+          output.str().find("copy effect") != std::string::npos, "adapter stream output shows file and history");
+    std::unique_ptr<CommandProcessor> polymorphic = std::make_unique<FileCommandProcessorAdapter>(fixture.file.string());
+    check(polymorphic->getCommand()->getText().empty(), "base interface dispatches file input");
+}
+
+void testFileAdapterReplay() {
+    CommandFileFixture fixture("replay\nloadmap next.map\n");
+    FileCommandProcessorAdapter processor(fixture.file.string());
+    GameEngine engine;
+    reachWin(engine);
+    std::ostringstream output;
+    runCommandTransitions(engine, processor, output);
+    check(engine.getCurrentStateName() == "map loaded" && processor.getCommandCount() == 2,
+          "file replay continues from start");
+}
+
+void testFileAdapterQuit() {
+    CommandFileFixture fixture("quit\nloadmap next.map\n");
+    FileCommandProcessorAdapter processor(fixture.file.string());
+    GameEngine engine;
+    reachWin(engine);
+    std::ostringstream output;
+    runCommandTransitions(engine, processor, output);
+    check(engine.isFinished() && processor.getCommandCount() == 1, "file quit stops reading");
+    check(processor.getCommand()->getText() == "loadmap next.map", "file quit leaves trailing input unread");
+}
+
+void testFileFailures() {
+    CommandFileFixture fixture("first\nsecond\n");
+    bool threw = false;
+    try { FileCommandProcessorAdapter missing((fixture.directory / "missing.txt").string()); }
+    catch (const std::runtime_error& error) {
+        threw = std::string(error.what()).find("missing.txt") != std::string::npos;
+    }
+    check(threw, "missing file reports its path");
+    FileLineReader source(fixture.file.string());
+    FileLineReader destination(fixture.file.string());
+    std::string line;
+    check(destination.readLineFromFile(line), "advance destination before failed assignment");
+    FileCommandProcessorAdapter adapterSource(fixture.file.string());
+    FileCommandProcessorAdapter adapterDestination(fixture.file.string());
+    adapterDestination.getCommand()->saveEffect("preserved");
+    std::filesystem::rename(fixture.file, fixture.directory / "moved.txt");
+    threw = false;
+    try { FileLineReader copy(source); } catch (const std::runtime_error&) { threw = true; }
+    check(threw, "reader copy reports reopen failure");
+    threw = false;
+    try { destination = source; } catch (const std::runtime_error&) { threw = true; }
+    check(threw && destination.readLineFromFile(line) && line == "second", "failed reader assignment preserves cursor");
+    threw = false;
+    try { adapterDestination = adapterSource; } catch (const std::runtime_error&) { threw = true; }
+    check(threw && adapterDestination.getCommandCount() == 1 &&
+          adapterDestination.getSavedCommand(0)->getEffect() == "preserved" &&
+          adapterDestination.getCommand()->getText() == "second", "failed adapter assignment preserves history and cursor");
+    threw = false;
+    try {
+        FileCommandProcessorAdapter directory(fixture.directory.string());
+        directory.getCommand();
+    } catch (const std::runtime_error&) { threw = true; }
+    check(threw, "directory input reports an open or read error instead of EOF");
+}
+
+void testFileCommands() {
+    testFileReaderLinesAndCopies();
+    testFileAdapterMatchesConsole();
+    testFileAdapterCopies();
+    testFileAdapterReplay();
+    testFileAdapterQuit();
+    testFileFailures();
+    std::cout << "PASS: File input, adapter transitions, independent copies, EOF, and failures.\n";
+}
 }
 
 bool testCommandProcessing() {
+    testFileCommands();
     testCommandValidation();
     testCommandTransitions();
     std::istringstream input(" \tloadmap  maps/my map.map \t\n\n \t\naddplayer Alice Smith");

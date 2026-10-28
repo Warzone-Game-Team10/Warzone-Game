@@ -1,7 +1,10 @@
 #include "CommandProcessing.h"
 
+#include <fstream>
 #include <iostream>
 #include <stdexcept>
+#include <filesystem>
+#include <utility>
 
 namespace {
 const std::string whitespace = " \t\r\n\f\v";
@@ -128,4 +131,88 @@ std::ostream& operator<<(std::ostream& out, const CommandProcessor& processor) {
     out << "Command history (" << processor.history.size() << "):\n";
     for (const auto& command : processor.history) out << *command << '\n';
     return out;
+}
+
+FileLineReader::FileLineReader(const std::string& filename)
+    : filename(std::filesystem::absolute(filename).string()),
+      input(std::make_unique<std::ifstream>()),
+      nextPosition(0), exhausted(false) {
+    std::error_code error;
+    if (!std::filesystem::is_regular_file(this->filename, error)) {
+        throw std::runtime_error("Cannot open command file '" + this->filename + "'.");
+    }
+    input->open(this->filename, std::ios::binary);
+    if (!input->is_open()) {
+        throw std::runtime_error("Cannot open command file '" + this->filename + "'.");
+    }
+}
+
+FileLineReader::FileLineReader(const FileLineReader& other) : FileLineReader(other.filename) {
+    nextPosition = other.nextPosition;
+    exhausted = other.exhausted;
+    if (!exhausted) {
+        input->seekg(nextPosition);
+        if (!*input) {
+            throw std::runtime_error("Cannot position copied command file '" + filename + "'.");
+        }
+    }
+}
+
+FileLineReader& FileLineReader::operator=(const FileLineReader& other) {
+    if (this != &other) {
+        FileLineReader copy(other);
+        filename.swap(copy.filename);
+        input.swap(copy.input);
+        std::swap(nextPosition, copy.nextPosition);
+        std::swap(exhausted, copy.exhausted);
+    }
+    return *this;
+}
+
+FileLineReader::~FileLineReader() = default;
+
+bool FileLineReader::readLineFromFile(std::string& line) {
+    if (exhausted) return false;
+    std::getline(*input, line);
+    if (input->bad() || (input->fail() && !input->eof())) {
+        throw std::runtime_error("Failed to read command file '" + filename + "'.");
+    }
+    exhausted = input->eof();
+    if (input->fail()) return false;
+    if (!exhausted) {
+        nextPosition = input->tellg();
+        if (nextPosition == std::streamoff(-1)) {
+            throw std::runtime_error("Cannot determine position in command file '" + filename + "'.");
+        }
+    }
+    return true;
+}
+
+std::ostream& operator<<(std::ostream& out, const FileLineReader& reader) {
+    return out << "Command file: " << reader.filename << "\nExhausted: " << reader.exhausted;
+}
+
+FileCommandProcessorAdapter::FileCommandProcessorAdapter(const std::string& filename)
+    : reader(std::make_unique<FileLineReader>(filename)) {}
+
+FileCommandProcessorAdapter::FileCommandProcessorAdapter(const FileCommandProcessorAdapter& other)
+    : CommandProcessor(other), reader(std::make_unique<FileLineReader>(*other.reader)) {}
+
+FileCommandProcessorAdapter& FileCommandProcessorAdapter::operator=(const FileCommandProcessorAdapter& other) {
+    if (this != &other) {
+        auto replacement = std::make_unique<FileLineReader>(*other.reader);
+        CommandProcessor::operator=(other);
+        reader.swap(replacement);
+    }
+    return *this;
+}
+
+FileCommandProcessorAdapter::~FileCommandProcessorAdapter() = default;
+
+bool FileCommandProcessorAdapter::readCommand(std::string& line) {
+    return reader->readLineFromFile(line);
+}
+
+std::ostream& operator<<(std::ostream& out, const FileCommandProcessorAdapter& adapter) {
+    return out << *adapter.reader << '\n' << static_cast<const CommandProcessor&>(adapter);
 }

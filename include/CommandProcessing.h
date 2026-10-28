@@ -44,3 +44,32 @@ public:
     const Command* getSavedCommand(std::size_t index) const;
     friend std::ostream& operator<<(std::ostream& out, const CommandProcessor& processor);
 };
+
+class FileLineReader {
+private:
+    std::string filename;
+    std::unique_ptr<std::ifstream> input;
+    std::streamoff nextPosition;
+    bool exhausted;
+
+public:
+    explicit FileLineReader(const std::string& filename);
+    FileLineReader(const FileLineReader& other);
+    FileLineReader& operator=(const FileLineReader& other);
+    ~FileLineReader();
+    bool readLineFromFile(std::string& line);
+    friend std::ostream& operator<<(std::ostream& out, const FileLineReader& reader);
+};
+
+class FileCommandProcessorAdapter : public CommandProcessor {
+private:
+    std::unique_ptr<FileLineReader> reader;
+    bool readCommand(std::string& line) override;
+
+public:
+    explicit FileCommandProcessorAdapter(const std::string& filename);
+    FileCommandProcessorAdapter(const FileCommandProcessorAdapter& other);
+    FileCommandProcessorAdapter& operator=(const FileCommandProcessorAdapter& other);
+    ~FileCommandProcessorAdapter() override;
+    friend std::ostream& operator<<(std::ostream& out, const FileCommandProcessorAdapter& adapter);
+};
