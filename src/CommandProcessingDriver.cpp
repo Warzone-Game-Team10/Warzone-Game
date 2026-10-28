@@ -12,7 +12,7 @@ void check(bool condition, const std::string& message) {
     }
 }
 
-void testCommandValidation() {
+void testCommandStateRules() {
     const std::vector<std::string> states = {
         "start", "map loaded", "map validated", "players added", "assign reinforcement",
         "issue orders", "execute orders", "win", "end", "unknown"
@@ -52,6 +52,11 @@ void testCommandValidation() {
             }
         }
     }
+}
+
+void testInvalidCommandSyntax() {
+    std::istringstream unused;
+    CommandProcessor processor(unused);
     struct InvalidSyntax {
         std::string text;
         std::string state;
@@ -78,12 +83,19 @@ void testCommandValidation() {
                   "syntax checked before state, with a descriptive replacement effect: " + scenario.text);
         }
     }
+}
+
+void testCommandWhitespaceAndLiterals() {
+    std::istringstream unused;
+    CommandProcessor processor(unused);
     Command spaced(" \tloadmap \"my map\" #literal \r");
     check(processor.validate(&spaced, "start") && spaced.getEffect().empty() &&
           spaced.getArgument() == "\"my map\" #literal", "whitespace and literal arguments accepted");
     Command noArgument(" \tquit \r");
     check(processor.validate(&noArgument, "win"), "trailing whitespace is not an argument");
+}
 
+void testReadingAfterCommandRejection() {
     std::istringstream input("\nloadmap\nquit\nloadmap maps/my map.map\n");
     CommandProcessor captured(input);
     const std::string state = "start";
@@ -97,6 +109,13 @@ void testCommandValidation() {
         check(!captured.getSavedCommand(i)->getEffect().empty(), "history retains rejection effects");
     }
     check(captured.getSavedCommand(3)->getEffect().empty(), "accepted capture has no execution effect");
+}
+
+void testCommandValidation() {
+    testCommandStateRules();
+    testInvalidCommandSyntax();
+    testCommandWhitespaceAndLiterals();
+    testReadingAfterCommandRejection();
     std::cout << "PASS: Command syntax, state validation, and rejection checks.\n";
 }
 }
