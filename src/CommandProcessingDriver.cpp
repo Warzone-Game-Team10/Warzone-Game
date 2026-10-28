@@ -151,10 +151,10 @@ void testStoredCommandTransitions() {
         check(engine.processCommand(*command), "stored command executes");
         check(engine.getCurrentStateName() == scenario.expectedState, "expected transition destination");
         check(processor.getSavedCommand(historyIndex) == command &&
-              command->getEffect().find("Transition demonstration") != std::string::npos &&
+              command->getEffect().find("Transition: ") != std::string::npos &&
               command->getEffect().find(before) != std::string::npos &&
               command->getEffect().find(scenario.expectedState) != std::string::npos,
-              "original history records demonstration outcome");
+              "original history records transition outcome");
         if (!command->getArgument().empty()) {
             check(command->getEffect().find(command->getArgument()) != std::string::npos,
                   "effect identifies parsed argument");
@@ -166,8 +166,8 @@ void testStoredCommandTransitions() {
     runCommandTransitions(engine, processor, output);
     check(engine.getCurrentStateName() == "assign reinforcement" && !engine.isFinished() &&
           processor.getCommandCount() == 6 &&
-          output.str().find("actual startup did not complete") != std::string::npos,
-          "EOF after demonstrated gamestart preserves state without claiming real startup");
+          output.str().find("End of input. Command processing stopped.") != std::string::npos,
+          "EOF after gamestart preserves state and reports stopped input");
     Command unavailable("loadmap missing.map");
     check(!engine.processCommand(unavailable) &&
           unavailable.getEffect().find("assign reinforcement") != std::string::npos &&
@@ -185,10 +185,10 @@ void testTransitionDriverRejectionAndEof() {
     check(processor.getCommandCount() == 6, "EOF does not create a command");
     for (std::size_t i : {0, 1, 2, 4}) {
         check(!processor.getSavedCommand(i)->getEffect().empty() &&
-              processor.getSavedCommand(i)->getEffect().find("Transition demonstration") == std::string::npos,
+              processor.getSavedCommand(i)->getEffect().find("Transition: ") == std::string::npos,
               "rejection effect survives driver processing");
     }
-    check(output.str().find("startup did not complete") != std::string::npos &&
+    check(output.str().find("End of input. Command processing stopped.") != std::string::npos &&
           output.str().find("Game finished") == std::string::npos, "incomplete EOF report");
     const std::string effect = processor.getSavedCommand(5)->getEffect();
     runCommandTransitions(engine, processor, output);
@@ -431,6 +431,12 @@ void testFileCommands() {
     testFileFailures();
     std::cout << "PASS: File input, adapter transitions, independent copies, EOF, and failures.\n";
 }
+
+void demonstrateCommands(CommandProcessor& processor) {
+    GameEngine engine;
+    runCommandTransitions(engine, processor, std::cout);
+    std::cout << processor;
+}
 }
 
 bool testCommandProcessing() {
@@ -514,8 +520,11 @@ bool testCommandProcessing() {
 }
 
 void demonstrateConsoleCommands() {
-    GameEngine engine;
     CommandProcessor processor;
-    runCommandTransitions(engine, processor, std::cout);
-    std::cout << processor;
+    demonstrateCommands(processor);
+}
+
+void demonstrateFileCommands(const std::string& filename) {
+    FileCommandProcessorAdapter processor(filename);
+    demonstrateCommands(processor);
 }

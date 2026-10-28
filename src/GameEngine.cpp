@@ -86,11 +86,11 @@ bool GameEngine::processCommand(Command& command) {
     const std::string name = command.getName();
     const std::string argument = command.getArgument();
     if (!processCommand(name)) {
-        command.saveEffect("Transition demonstration failed: command '" + name +
+        command.saveEffect("Transition failed: command '" + name +
                            "' has no transition in state '" + before + "'.");
         return false;
     }
-    command.saveEffect("Transition demonstration: " + name +
+    command.saveEffect("Transition: " + name +
                        (argument.empty() ? "" : " [" + argument + "]") +
                        ": '" + before + "' -> '" + currentState + "'.");
     return true;

@@ -38,7 +38,7 @@ const std::string& Command::getEffect() const { return effect; }
 void Command::saveEffect(const std::string& newEffect) { effect = newEffect; }
 
 std::ostream& operator<<(std::ostream& out, const Command& command) {
-    return out << "Command: " << command.text << "\nEffect: " << command.effect;
+    return out << "Command: " << command.text << "\n\nEffect: " << command.effect;
 }
 
 CommandProcessor::CommandProcessor() : CommandProcessor(std::cin) {}
@@ -128,8 +128,8 @@ Command* CommandProcessor::getSavedCommand(std::size_t index) { return history.a
 const Command* CommandProcessor::getSavedCommand(std::size_t index) const { return history.at(index).get(); }
 
 std::ostream& operator<<(std::ostream& out, const CommandProcessor& processor) {
-    out << "Command history (" << processor.history.size() << "):\n";
-    for (const auto& command : processor.history) out << *command << '\n';
+    out << "Command history (" << processor.history.size() << "):\n\n";
+    for (const auto& command : processor.history) out << *command << "\n\n";
     return out;
 }
 

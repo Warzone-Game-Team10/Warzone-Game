@@ -3,20 +3,18 @@
 #include "CommandProcessing.h"
 
 void runCommandTransitions(GameEngine& engine, CommandProcessor& processor, std::ostream& out) {
-    out << "State-transition demonstration only; actual startup operations are not performed.\n"
-        << engine << '\n';
+    out << engine << '\n';
     while (!engine.isFinished()) {
         out << "\n[" << engine.getCurrentStateName() << "] Enter command: " << std::flush;
         Command* command = processor.getCommand();
         if (!command) {
-            out << "End of input. Command processing stopped; actual startup did not complete "
-                   "in this transition demonstration.\n";
+            out << "End of input. Command processing stopped.\n";
             return;
         }
         if (processor.validate(command, engine.getCurrentStateName())) {
             engine.processCommand(*command);
         }
-        out << *command << '\n';
+        out << '\n' << *command << '\n';
     }
     out << "Quit accepted. Command processing stopped.\n";
 }

@@ -13,10 +13,24 @@
 namespace {
 
 void printUsage(std::ostream& out, const char* program) {
-    out << "Usage: " << program << " [map|player|orders|cards|gameengine|commands|all] [maps-directory]\n"
+    out << "Usage: " << program << " -console\n"
+        << "       " << program << " -file <filename>\n"
+        << "       " << program << " [map|player|orders|cards|all] [maps-directory]\n"
+        << "       " << program << " [gameengine|commands]\n"
         << "       " << program << " --help\n"
         << "Defaults: all tests, maps/ directory\n"
         << "Available components: map, player, orders, cards, gameengine, commands\n";
+        << "commands: run command-processing tests.\n"
+        << "all: run all tests.\n"
+        << "-console: type game commands in the terminal.\n"
+        << "-file <filename>: read game commands from a text file.\n"
+        << "Use one option per run. Only -console and gameengine wait for keyboard input.\n";
+}
+
+int usageError(const char* program, const char* message) {
+    std::cerr << "Error: " << message << '\n';
+    printUsage(std::cerr, program);
+    return 1;
 }
 
 }
@@ -29,14 +43,31 @@ int main(int argc, char* argv[]) {
         return 0;
     }
 
-    if (argc > 3 ||
-        (command != "map" && command != "player" && command != "orders" && command != "cards" && command != "gameengine" && command != "commands" && command != "all") ||
-        (argc == 3 && (command == "cards" || command == "gameengine" || command == "commands"))) {
-        printUsage(std::cerr, argv[0]);
-        return 1;
-    }
-
     try {
+        if (command == "-console") {
+            if (argc != 2) {
+                return usageError(argv[0], "-console accepts no additional arguments or input modes.");
+            }
+            demonstrateConsoleCommands();
+            return 0;
+        }
+        if (command == "-file") {
+            if (argc != 3 || std::string_view(argv[2]).empty() || std::string_view(argv[2]).starts_with("-")) {
+                return usageError(argv[0], "-file requires one filename and no additional input mode.");
+            }
+            demonstrateFileCommands(argv[2]);
+            return 0;
+        }
+
+        const bool acceptsMapDirectory =
+            command == "map" || command == "player" || command == "orders" || command == "all";
+        const bool knownComponent =
+            acceptsMapDirectory || command == "cards" || command == "gameengine" || command == "commands";
+        if (!knownComponent || argc > 3 ||
+            (argc == 3 && (!acceptsMapDirectory || std::string_view(argv[2]).starts_with("-")))) {
+            return usageError(argv[0], "Invalid driver or launch arguments.");
+        }
+
         const std::filesystem::path mapDirectory =
             argc == 3 ? argv[2] : "maps";
 
@@ -88,9 +119,8 @@ int main(int argc, char* argv[]) {
             testGameStates();
         }
 
-        if (command == "commands") {
+        if (command == "commands" || command == "all") {
             passed = testCommandProcessing() && passed;
-            demonstrateConsoleCommands();
         }
 
         std::cout << (passed ? "\nALL SELECTED TESTS PASSED\n"
