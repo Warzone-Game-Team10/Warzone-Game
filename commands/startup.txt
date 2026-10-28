@@ -1,0 +1,5 @@
+loadmap demo.map
+validatemap
+addplayer Jane
+addplayer John
+gamestart

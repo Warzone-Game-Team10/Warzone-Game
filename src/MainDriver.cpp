@@ -19,7 +19,7 @@ void printUsage(std::ostream& out, const char* program) {
         << "       " << program << " [gameengine|commands]\n"
         << "       " << program << " --help\n"
         << "Defaults: all tests, maps/ directory\n"
-        << "Available components: map, player, orders, cards, gameengine, commands\n";
+        << "Available components: map, player, orders, cards, gameengine, commands\n"
         << "commands: run command-processing tests.\n"
         << "all: run all tests.\n"
         << "-console: type game commands in the terminal.\n"

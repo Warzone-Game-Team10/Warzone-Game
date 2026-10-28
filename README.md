@@ -55,6 +55,22 @@ Windows PowerShell:
 End console input with Ctrl+D on macOS/Linux, or Ctrl+Z then Enter on Windows.
 File input stops automatically at EOF.
 
+Saved examples (run from the project root):
+
+macOS/Linux:
+
+```sh
+./warzone-tests.exe -file commands/startup.txt
+./warzone-tests.exe -file commands/mixed.txt
+```
+
+Windows PowerShell:
+
+```powershell
+.\warzone-tests.exe -file commands\startup.txt
+.\warzone-tests.exe -file commands\mixed.txt
+```
+
 To create a temporary input file and run it, paste one of these blocks.
 Edit the command lines as needed.
 
@@ -64,8 +80,8 @@ macOS/Linux:
 cat > /tmp/warzone-commands.txt <<'EOF'
 loadmap demo.map
 validatemap
-addplayer Alice
-addplayer Bob
+addplayer Jane
+addplayer John
 gamestart
 EOF
 ./warzone-tests.exe -file /tmp/warzone-commands.txt
