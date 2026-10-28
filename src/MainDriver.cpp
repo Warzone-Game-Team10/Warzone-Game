@@ -3,6 +3,7 @@
 #include "PlayerDriver.h"
 #include "OrdersDriver.h"
 #include "GameEngineDriver.h"
+#include "CommandProcessingDriver.h"
 
 #include <exception>
 #include <filesystem>
@@ -12,10 +13,10 @@
 namespace {
 
 void printUsage(std::ostream& out, const char* program) {
-    out << "Usage: " << program << " [map|player|orders|cards|gameengine|all] [maps-directory]\n"
+    out << "Usage: " << program << " [map|player|orders|cards|gameengine|commands|all] [maps-directory]\n"
         << "       " << program << " --help\n"
         << "Defaults: all tests, maps/ directory\n"
-        << "Available components: map, player, orders, cards\n";
+        << "Available components: map, player, orders, cards, gameengine, commands\n";
 }
 
 }
@@ -29,8 +30,8 @@ int main(int argc, char* argv[]) {
     }
 
     if (argc > 3 ||
-        (command != "map" && command != "player" && command != "orders" && command != "cards" && command != "gameengine" && command != "all") ||
-        (argc == 3 && (command == "cards" || command == "gameengine"))) {
+        (command != "map" && command != "player" && command != "orders" && command != "cards" && command != "gameengine" && command != "commands" && command != "all") ||
+        (argc == 3 && (command == "cards" || command == "gameengine" || command == "commands"))) {
         printUsage(std::cerr, argv[0]);
         return 1;
     }
@@ -85,6 +86,11 @@ int main(int argc, char* argv[]) {
             std::cout << "\n=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-= Part 5: Game Engine =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=\n";
 
             testGameStates();
+        }
+
+        if (command == "commands") {
+            passed = testCommandProcessing() && passed;
+            demonstrateConsoleCommands();
         }
 
         std::cout << (passed ? "\nALL SELECTED TESTS PASSED\n"

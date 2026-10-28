@@ -37,7 +37,7 @@ void GameEngine::buildTransitions() {
     transitions["map loaded"]["validatemap"] = "map validated";
     transitions["map validated"]["addplayer"] = "players added";
     transitions["players added"]["addplayer"] = "players added";
-    transitions["players added"]["assigncountries"] = "assign reinforcement";
+    transitions["players added"]["gamestart"] = "assign reinforcement";
 
     // play phase
     transitions["assign reinforcement"]["issueorder"] = "issue orders";
@@ -46,8 +46,8 @@ void GameEngine::buildTransitions() {
     transitions["execute orders"]["execorder"] = "execute orders";
     transitions["execute orders"]["endexecorders"] = "assign reinforcement";
     transitions["execute orders"]["win"] = "win";
-    transitions["win"]["play"] = "start";
-    transitions["win"]["end"] = "end";
+    transitions["win"]["replay"] = "start";
+    transitions["win"]["quit"] = "end";
 }
 
 // processe command
