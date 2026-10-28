@@ -1,5 +1,7 @@
 #include "CommandProcessingDriver.h"
 #include "CommandProcessing.h"
+#include "GameEngine.h"
+#include "GameEngineDriver.h"
 
 #include <iostream>
 #include <sstream>
@@ -111,6 +113,126 @@ void testReadingAfterCommandRejection() {
     check(captured.getSavedCommand(3)->getEffect().empty(), "accepted capture has no execution effect");
 }
 
+void reachWin(GameEngine& engine) {
+    for (const std::string event : {"loadmap", "validatemap", "addplayer", "gamestart",
+                                    "issueorder", "endissueorders", "win"}) {
+        check(engine.processCommand(event), "win fixture transition: " + event);
+    }
+}
+
+void testStoredCommandTransitions() {
+    struct TransitionScenario {
+        std::string text;
+        std::string expectedState;
+    };
+    const TransitionScenario scenarios[] = {
+        {" \tloadmap maps/my map.map ", "map loaded"},
+        {"loadmap other.map", "map loaded"},
+        {"validatemap", "map validated"},
+        {"addplayer Alice Smith", "players added"},
+        {"addplayer Bob", "players added"},
+        {"gamestart", "assign reinforcement"}
+    };
+    std::ostringstream commandLines;
+    for (const auto& scenario : scenarios) {
+        commandLines << scenario.text << '\n';
+    }
+    std::istringstream input(commandLines.str());
+    CommandProcessor processor(input);
+    GameEngine engine;
+    for (const auto& scenario : scenarios) {
+        const std::size_t historyIndex = processor.getCommandCount();
+        Command* command = processor.getCommand();
+        check(command && processor.validate(command, engine.getCurrentStateName()), "valid stored input");
+        const std::string before = engine.getCurrentStateName();
+        check(engine.processCommand(*command), "stored command executes");
+        check(engine.getCurrentStateName() == scenario.expectedState, "expected transition destination");
+        check(processor.getSavedCommand(historyIndex) == command &&
+              command->getEffect().find("Transition demonstration") != std::string::npos &&
+              command->getEffect().find(before) != std::string::npos &&
+              command->getEffect().find(scenario.expectedState) != std::string::npos,
+              "original history records demonstration outcome");
+        if (!command->getArgument().empty()) {
+            check(command->getEffect().find(command->getArgument()) != std::string::npos,
+                  "effect identifies parsed argument");
+        }
+    }
+    check(processor.getSavedCommand(0)->getText() == " \tloadmap maps/my map.map ",
+          "execution preserves original text");
+    std::ostringstream output;
+    runCommandTransitions(engine, processor, output);
+    check(engine.getCurrentStateName() == "assign reinforcement" && !engine.isFinished() &&
+          processor.getCommandCount() == 6 &&
+          output.str().find("actual startup did not complete") != std::string::npos,
+          "EOF after demonstrated gamestart preserves state without claiming real startup");
+    Command unavailable("loadmap missing.map");
+    check(!engine.processCommand(unavailable) &&
+          unavailable.getEffect().find("assign reinforcement") != std::string::npos &&
+          engine.getCurrentStateName() == "assign reinforcement", "engine failure records unchanged state");
+}
+
+void testTransitionDriverRejectionAndEof() {
+    std::istringstream input("\nloadmap\nquit\nloadmap my map.map\nwin\nvalidatemap");
+    CommandProcessor processor(input);
+    GameEngine engine;
+    std::ostringstream output;
+    runCommandTransitions(engine, processor, output);
+    check(engine.getCurrentStateName() == "map validated" && !engine.isFinished(),
+          "rejections preserve state and EOF does not quit");
+    check(processor.getCommandCount() == 6, "EOF does not create a command");
+    for (std::size_t i : {0, 1, 2, 4}) {
+        check(!processor.getSavedCommand(i)->getEffect().empty() &&
+              processor.getSavedCommand(i)->getEffect().find("Transition demonstration") == std::string::npos,
+              "rejection effect survives driver processing");
+    }
+    check(output.str().find("startup did not complete") != std::string::npos &&
+          output.str().find("Game finished") == std::string::npos, "incomplete EOF report");
+    const std::string effect = processor.getSavedCommand(5)->getEffect();
+    runCommandTransitions(engine, processor, output);
+    check(processor.getCommandCount() == 6 && processor.getSavedCommand(5)->getEffect() == effect,
+          "repeated EOF preserves history and effects");
+    std::istringstream empty;
+    CommandProcessor emptyProcessor(empty);
+    GameEngine fresh;
+    runCommandTransitions(fresh, emptyProcessor, output);
+    check(fresh.getCurrentStateName() == "start" && emptyProcessor.getCommandCount() == 0,
+          "immediate EOF preserves initial state");
+}
+
+void testTransitionDriverReplay() {
+    GameEngine engine;
+    reachWin(engine);
+    std::istringstream replayInput("replay\nloadmap replay map.map\n");
+    CommandProcessor replayProcessor(replayInput);
+    std::ostringstream output;
+    runCommandTransitions(engine, replayProcessor, output);
+    check(engine.getCurrentStateName() == "map loaded" &&
+          replayProcessor.getSavedCommand(0)->getEffect().find("'win' -> 'start'") != std::string::npos,
+          "replay returns to start and continues reading");
+}
+
+void testTransitionDriverQuit() {
+    GameEngine quitting;
+    reachWin(quitting);
+    std::istringstream quitInput("quit\nloadmap unread.map\n");
+    CommandProcessor quitProcessor(quitInput);
+    std::ostringstream output;
+    runCommandTransitions(quitting, quitProcessor, output);
+    check(quitting.isFinished() && quitProcessor.getCommandCount() == 1 &&
+          quitProcessor.getSavedCommand(0)->getEffect().find("'win' -> 'end'") != std::string::npos &&
+          output.str().find("Quit accepted") != std::string::npos &&
+          output.str().find("End of input") == std::string::npos, "quit ends run before another read");
+    check(quitProcessor.getCommand()->getText() == "loadmap unread.map", "quit leaves trailing input unread");
+}
+
+void testCommandTransitions() {
+    testStoredCommandTransitions();
+    testTransitionDriverRejectionAndEof();
+    testTransitionDriverReplay();
+    testTransitionDriverQuit();
+    std::cout << "PASS: Stored-command transitions, rejection, replay, quit, and EOF.\n";
+}
+
 void testCommandValidation() {
     testCommandStateRules();
     testInvalidCommandSyntax();
@@ -122,6 +244,7 @@ void testCommandValidation() {
 
 bool testCommandProcessing() {
     testCommandValidation();
+    testCommandTransitions();
     std::istringstream input(" \tloadmap  maps/my map.map \t\n\n \t\naddplayer Alice Smith");
     CommandProcessor processor(input);
     Command* first = processor.getCommand();
@@ -199,11 +322,8 @@ bool testCommandProcessing() {
 }
 
 void demonstrateConsoleCommands() {
+    GameEngine engine;
     CommandProcessor processor;
-    std::cout << "Enter command lines; end input to stop. Capture demonstration only.\n";
-    while (Command* command = processor.getCommand()) {
-        command->saveEffect("Captured; not validated or executed.");
-        std::cout << *command << '\n';
-    }
-    std::cout << "End of input. Command processing stopped.\n" << processor;
+    runCommandTransitions(engine, processor, std::cout);
+    std::cout << processor;
 }

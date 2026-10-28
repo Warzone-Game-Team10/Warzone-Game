@@ -1,4 +1,5 @@
 #include "GameEngine.h"
+#include "CommandProcessing.h"
 
 
 // constructors -----------------------------
@@ -60,12 +61,10 @@ bool GameEngine::processCommand(const std::string& command) {
         std::map<std::string, std::string>::const_iterator edge = state->second.find(command);
         if (edge != state->second.end()) {
             currentState = edge->second;
-            std::cout << "Transition accepted. Current state: " << currentState << std::endl;
             return true;
         }
     }
 
-    std::cout << "Error: command '" << command << "' is not valid in state '" << currentState << "'." << std::endl;
     return false;
 }
 
@@ -80,4 +79,19 @@ bool GameEngine::isFinished() const {
 std::ostream& operator<<(std::ostream& out, const GameEngine& e) {
     out << "GameEngine current state: " << e.currentState;
     return out;
+}
+
+bool GameEngine::processCommand(Command& command) {
+    const std::string before = currentState;
+    const std::string name = command.getName();
+    const std::string argument = command.getArgument();
+    if (!processCommand(name)) {
+        command.saveEffect("Transition demonstration failed: command '" + name +
+                           "' has no transition in state '" + before + "'.");
+        return false;
+    }
+    command.saveEffect("Transition demonstration: " + name +
+                       (argument.empty() ? "" : " [" + argument + "]") +
+                       ": '" + before + "' -> '" + currentState + "'.");
+    return true;
 }

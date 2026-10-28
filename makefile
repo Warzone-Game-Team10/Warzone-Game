@@ -28,16 +28,16 @@ Orders.o: src/Orders.cpp include/Orders.h
 OrdersDriver.o: src/OrdersDriver.cpp include/OrdersDriver.h include/Orders.h
 	g++ -std=c++20 -Iinclude -c src/OrdersDriver.cpp -o OrdersDriver.o
 
-GameEngineDriver.o: src/GameEngineDriver.cpp include/GameEngineDriver.h include/GameEngine.h
+GameEngineDriver.o: src/GameEngineDriver.cpp include/GameEngineDriver.h include/GameEngine.h include/CommandProcessing.h
 	g++ -std=c++20 -Iinclude -c src/GameEngineDriver.cpp -o GameEngineDriver.o
 
-GameEngine.o: src/GameEngine.cpp include/GameEngine.h
+GameEngine.o: src/GameEngine.cpp include/GameEngine.h include/CommandProcessing.h
 	g++ -std=c++20 -Iinclude -c src/GameEngine.cpp -o GameEngine.o
 
 CommandProcessing.o: src/CommandProcessing.cpp include/CommandProcessing.h
 	g++ -std=c++20 -Iinclude -c src/CommandProcessing.cpp -o CommandProcessing.o
 
-CommandProcessingDriver.o: src/CommandProcessingDriver.cpp include/CommandProcessingDriver.h include/CommandProcessing.h
+CommandProcessingDriver.o: src/CommandProcessingDriver.cpp include/CommandProcessingDriver.h include/CommandProcessing.h include/GameEngine.h include/GameEngineDriver.h
 	g++ -std=c++20 -Iinclude -c src/CommandProcessingDriver.cpp -o CommandProcessingDriver.o
 
 run: output

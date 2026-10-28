@@ -5,6 +5,8 @@
 #include <vector>
 #include <string>
 
+class Command;
+
 // GAME ENGINE: controls flow of the game with state, transition & command
 class GameEngine {
 private:
@@ -21,6 +23,7 @@ public:
     ~GameEngine(); //destructor
 
     bool processCommand(const std::string& command);
+    bool processCommand(Command& command);
     std::string getCurrentStateName() const;
     bool isFinished() const;
 
