@@ -11,9 +11,98 @@ void check(bool condition, const std::string& message) {
         throw std::runtime_error("Command processing check failed: " + message);
     }
 }
+
+void testCommandValidation() {
+    const std::vector<std::string> states = {
+        "start", "map loaded", "map validated", "players added", "assign reinforcement",
+        "issue orders", "execute orders", "win", "end", "unknown"
+    };
+    struct Scenario {
+        std::string text;
+        std::vector<std::string> allowedStates;
+    };
+    const std::vector<Scenario> scenarios = {
+        {"loadmap maps/my map.map", {"start", "map loaded"}},
+        {"validatemap", {"map loaded"}},
+        {"addplayer Alice Smith", {"map validated", "players added"}},
+        {"gamestart", {"players added"}},
+        {"replay", {"win"}},
+        {"quit", {"win"}}
+    };
+    std::istringstream unused;
+    CommandProcessor processor(unused);
+    for (const auto& scenario : scenarios) {
+        for (const auto& state : states) {
+            bool expected = false;
+            for (const auto& allowed : scenario.allowedStates) {
+                if (state == allowed) expected = true;
+            }
+            Command command(scenario.text);
+            command.saveEffect("Previous execution outcome");
+            check(processor.validate(&command, state) == expected,
+                  scenario.text + " in " + state);
+            check(command.getText() == scenario.text, "validation preserves original text");
+            if (expected) {
+                check(command.getEffect() == "Previous execution outcome",
+                      "acceptance does not claim execution or overwrite its effect");
+            } else {
+                check(command.getEffect().find(state) != std::string::npos &&
+                      command.getEffect().find(command.getName()) != std::string::npos,
+                      "state rejection identifies command and state");
+            }
+        }
+    }
+    struct InvalidSyntax {
+        std::string text;
+        std::string state;
+        std::string error;
+    };
+    const InvalidSyntax malformed[] = {
+        {"", "start", "empty"}, {" \t\r", "start", "empty"},
+        {"LOADMAP map", "start", "Unknown"}, {"unknown", "start", "Unknown"},
+        {"assigncountries", "players added", "Unknown"}, {"play", "win", "Unknown"},
+        {"end", "win", "Unknown"},
+        {"loadmap", "start", "argument is required"}, {"loadmap \t", "map loaded", "argument is required"},
+        {"addplayer", "map validated", "argument is required"},
+        {"addplayer \r\t", "players added", "argument is required"},
+        {"validatemap extra", "map loaded", "no argument is allowed"},
+        {"gamestart extra", "players added", "no argument is allowed"},
+        {"replay extra", "win", "no argument is allowed"}, {"quit extra", "win", "no argument is allowed"}
+    };
+    for (const auto& scenario : malformed) {
+        for (const auto& state : {scenario.state, std::string("unknown")}) {
+            Command command(scenario.text);
+            command.saveEffect("Old effect");
+            check(!processor.validate(&command, state), "reject malformed input: " + scenario.text);
+            check(command.getEffect().find(scenario.error) != std::string::npos,
+                  "syntax checked before state, with a descriptive replacement effect: " + scenario.text);
+        }
+    }
+    Command spaced(" \tloadmap \"my map\" #literal \r");
+    check(processor.validate(&spaced, "start") && spaced.getEffect().empty() &&
+          spaced.getArgument() == "\"my map\" #literal", "whitespace and literal arguments accepted");
+    Command noArgument(" \tquit \r");
+    check(processor.validate(&noArgument, "win"), "trailing whitespace is not an argument");
+
+    std::istringstream input("\nloadmap\nquit\nloadmap maps/my map.map\n");
+    CommandProcessor captured(input);
+    const std::string state = "start";
+    int accepted = 0;
+    while (Command* command = captured.getCommand()) {
+        if (captured.validate(command, state)) ++accepted;
+    }
+    check(accepted == 1 && captured.getCommandCount() == 4 && state == "start",
+          "rejections preserve state and reading continues to valid input and EOF");
+    for (std::size_t i = 0; i < 3; ++i) {
+        check(!captured.getSavedCommand(i)->getEffect().empty(), "history retains rejection effects");
+    }
+    check(captured.getSavedCommand(3)->getEffect().empty(), "accepted capture has no execution effect");
+    std::cout << "PASS: Command syntax, state validation, and rejection checks.\n";
+}
 }
 
 bool testCommandProcessing() {
+    testCommandValidation();
     std::istringstream input(" \tloadmap  maps/my map.map \t\n\n \t\naddplayer Alice Smith");
     CommandProcessor processor(input);
     Command* first = processor.getCommand();

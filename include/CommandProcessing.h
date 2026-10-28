@@ -38,6 +38,7 @@ public:
     CommandProcessor& operator=(const CommandProcessor& other);
     virtual ~CommandProcessor();
     Command* getCommand();
+    bool validate(Command* command, const std::string& currentState);
     std::size_t getCommandCount() const;
     Command* getSavedCommand(std::size_t index);
     const Command* getSavedCommand(std::size_t index) const;

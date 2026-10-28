@@ -60,7 +60,6 @@ CommandProcessor& CommandProcessor::operator=(const CommandProcessor& other) {
 CommandProcessor::~CommandProcessor() = default;
 
 bool CommandProcessor::readCommand(std::string& line) {
-    // Streams with exception masks still distinguish normal EOF from failure.
     try {
         std::getline(*input, line);
     } catch (const std::ios_base::failure&) {
@@ -82,6 +81,43 @@ Command* CommandProcessor::saveCommand(const std::string& line) {
 Command* CommandProcessor::getCommand() {
     std::string line;
     return readCommand(line) ? saveCommand(line) : nullptr;
+}
+
+bool CommandProcessor::validate(Command* command, const std::string& currentState) {
+    struct Rule {
+        std::string name;
+        bool requiresArgument;
+        std::vector<std::string> states;
+    };
+    static const Rule rules[] = {
+        {"loadmap", true, {"start", "map loaded"}},
+        {"validatemap", false, {"map loaded"}},
+        {"addplayer", true, {"map validated", "players added"}},
+        {"gamestart", false, {"players added"}},
+        {"replay", false, {"win"}},
+        {"quit", false, {"win"}}
+    };
+    const std::string name = command->getName();
+    if (name.empty()) {
+        command->saveEffect("Invalid command: input is empty.");
+        return false;
+    }
+    for (const auto& rule : rules) {
+        if (name != rule.name) continue;
+        const bool hasArgument = !command->getArgument().empty();
+        if (hasArgument != rule.requiresArgument) {
+            command->saveEffect("Invalid command '" + name + "': " +
+                                (rule.requiresArgument ? "an argument is required." : "no argument is allowed."));
+            return false;
+        }
+        for (const auto& state : rule.states) {
+            if (currentState == state) return true;
+        }
+        command->saveEffect("Command '" + name + "' is not allowed in state '" + currentState + "'.");
+        return false;
+    }
+    command->saveEffect("Unknown command '" + name + "'.");
+    return false;
 }
 
 std::size_t CommandProcessor::getCommandCount() const { return history.size(); }
