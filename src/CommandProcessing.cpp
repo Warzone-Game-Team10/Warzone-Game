@@ -110,6 +110,9 @@ Command* CommandProcessor::getCommand() {
  * Stores a rejection effect if invalid; accepted commands keep their current effect
  */
 bool CommandProcessor::validate(Command* command, const std::string& currentState) {
+    /**
+     * Stores a command name, its argument requirement, and its allowed states
+     */
     struct Rule {
         std::string name;
         bool requiresArgument;

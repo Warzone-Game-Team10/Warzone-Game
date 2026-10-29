@@ -38,6 +38,7 @@ private:
     std::istream* input;
     std::vector<std::unique_ptr<Command>> history;
 
+protected:
     // reads the next input line and returns false at the end of input
     virtual bool readCommand(std::string& line);
 
