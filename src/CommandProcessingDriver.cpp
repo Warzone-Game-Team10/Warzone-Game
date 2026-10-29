@@ -11,17 +11,23 @@
 #include <fstream>
 
 namespace {
+// throws a test failure with the given message when a condition is false
 void check(bool condition, const std::string& message) {
     if (!condition) {
         throw std::runtime_error("Command processing check failed: " + message);
     }
 }
 
+// checks each command against allowed and rejected states and verifies its effect
 void testCommandStateRules() {
     const std::vector<std::string> states = {
         "start", "map loaded", "map validated", "players added", "assign reinforcement",
         "issue orders", "execute orders", "win", "end", "unknown"
     };
+
+    /**
+     * Stores a command and the states where it is allowed
+     */
     struct Scenario {
         std::string text;
         std::vector<std::string> allowedStates;
@@ -59,9 +65,14 @@ void testCommandStateRules() {
     }
 }
 
+// checks rejection effects for empty input, unknown commands, and invalid arguments
 void testInvalidCommandSyntax() {
     std::istringstream unused;
     CommandProcessor processor(unused);
+
+    /**
+     * Stores malformed input, a test state, and the expected error text
+     */
     struct InvalidSyntax {
         std::string text;
         std::string state;
@@ -90,6 +101,7 @@ void testInvalidCommandSyntax() {
     }
 }
 
+// checks whitespace handling and preserves quotes and other literal argument characters
 void testCommandWhitespaceAndLiterals() {
     std::istringstream unused;
     CommandProcessor processor(unused);
@@ -100,6 +112,7 @@ void testCommandWhitespaceAndLiterals() {
     check(processor.validate(&noArgument, "win"), "trailing whitespace is not an argument");
 }
 
+// checks that reading continues after rejected commands and retains their effects
 void testReadingAfterCommandRejection() {
     std::istringstream input("\nloadmap\nquit\nloadmap maps/my map.map\n");
     CommandProcessor captured(input);
@@ -116,6 +129,7 @@ void testReadingAfterCommandRejection() {
     check(captured.getSavedCommand(3)->getEffect().empty(), "accepted capture has no execution effect");
 }
 
+// moves the engine to win through internal transitions for replay and quit tests
 void reachWin(GameEngine& engine) {
     for (const std::string event : {"loadmap", "validatemap", "addplayer", "gamestart",
                                     "issueorder", "endissueorders", "win"}) {
@@ -123,7 +137,12 @@ void reachWin(GameEngine& engine) {
     }
 }
 
+// checks startup transitions, self-loops, and effects stored in command history
 void testStoredCommandTransitions() {
+
+    /**
+     * Stores a command and its expected destination state
+     */
     struct TransitionScenario {
         std::string text;
         std::string expectedState;
@@ -174,6 +193,7 @@ void testStoredCommandTransitions() {
           engine.getCurrentStateName() == "assign reinforcement", "engine failure records unchanged state");
 }
 
+// checks driver rejection effects and verifies that eof preserves state and history
 void testTransitionDriverRejectionAndEof() {
     std::istringstream input("\nloadmap\nquit\nloadmap my map.map\nwin\nvalidatemap");
     CommandProcessor processor(input);
@@ -202,6 +222,7 @@ void testTransitionDriverRejectionAndEof() {
           "immediate EOF preserves initial state");
 }
 
+// checks that replay returns to start and the driver continues reading commands
 void testTransitionDriverReplay() {
     GameEngine engine;
     reachWin(engine);
@@ -214,6 +235,7 @@ void testTransitionDriverReplay() {
           "replay returns to start and continues reading");
 }
 
+// checks that quit ends the driver and leaves later commands unread
 void testTransitionDriverQuit() {
     GameEngine quitting;
     reachWin(quitting);
@@ -228,6 +250,7 @@ void testTransitionDriverQuit() {
     check(quitProcessor.getCommand()->getText() == "loadmap unread.map", "quit leaves trailing input unread");
 }
 
+// runs checks for stored-command transitions, driver rejection, replay, quit, and eof
 void testCommandTransitions() {
     testStoredCommandTransitions();
     testTransitionDriverRejectionAndEof();
@@ -236,6 +259,7 @@ void testCommandTransitions() {
     std::cout << "PASS: Stored-command transitions, rejection, replay, quit, and EOF.\n";
 }
 
+// runs checks for command syntax, allowed states, whitespace, and rejection handling
 void testCommandValidation() {
     testCommandStateRules();
     testInvalidCommandSyntax();
@@ -244,14 +268,17 @@ void testCommandValidation() {
     std::cout << "PASS: Command syntax, state validation, and rejection checks.\n";
 }
 
+/**
+ * Creates a temporary command file and removes its directory after the test
+ */
 struct CommandFileFixture {
     std::filesystem::path directory;
     std::filesystem::path file;
-    explicit CommandFileFixture(const std::string& contents);
-    ~CommandFileFixture();
+    explicit CommandFileFixture(const std::string& contents); // parameterized constructor
+    ~CommandFileFixture(); // destructor
 };
 
-CommandFileFixture::CommandFileFixture(const std::string& contents) {
+CommandFileFixture::CommandFileFixture(const std::string& contents) { // parameterized constructor
     directory = std::filesystem::temp_directory_path() /
                 ("warzone-commands-" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
     check(std::filesystem::create_directory(directory), "create isolated command fixture directory");
@@ -265,11 +292,12 @@ CommandFileFixture::CommandFileFixture(const std::string& contents) {
     }
 }
 
-CommandFileFixture::~CommandFileFixture() {
+CommandFileFixture::~CommandFileFixture() { // destructor
     std::error_code error;
     std::filesystem::remove_all(directory, error);
 }
 
+// checks file line order, blank lines, eof, and independent reader copies
 void testFileReaderLinesAndCopies() {
     CommandFileFixture fixture("first\n\nlast");
     FileLineReader reader(fixture.file.string());
@@ -308,6 +336,7 @@ void testFileReaderLinesAndCopies() {
     check(!assigned.readLineFromFile(line), "trailing newline creates no extra line");
 }
 
+// checks that file and console input produce matching states, output, and histories
 void testFileAdapterMatchesConsole() {
     const std::string text = "\nloadmap\nloadmap my map.map\nquit\nvalidatemap\naddplayer Alice Smith\ngamestart";
     CommandFileFixture fixture(text);
@@ -332,6 +361,7 @@ void testFileAdapterMatchesConsole() {
     check(!exhausted.getCommand(), "adapter copy preserves EOF");
 }
 
+// checks independent adapter histories and readers, copying, and input through a base pointer
 void testFileAdapterCopies() {
     CommandFileFixture fixture("\nloadmap\nloadmap my map.map\n");
     FileCommandProcessorAdapter source(fixture.file.string());
@@ -365,6 +395,7 @@ void testFileAdapterCopies() {
     check(polymorphic->getCommand()->getText().empty(), "base interface dispatches file input");
 }
 
+// checks that replay from file input returns to start and continues reading
 void testFileAdapterReplay() {
     CommandFileFixture fixture("replay\nloadmap next.map\n");
     FileCommandProcessorAdapter processor(fixture.file.string());
@@ -376,6 +407,7 @@ void testFileAdapterReplay() {
           "file replay continues from start");
 }
 
+// checks that quit from file input ends processing and leaves later commands unread
 void testFileAdapterQuit() {
     CommandFileFixture fixture("quit\nloadmap next.map\n");
     FileCommandProcessorAdapter processor(fixture.file.string());
@@ -387,6 +419,7 @@ void testFileAdapterQuit() {
     check(processor.getCommand()->getText() == "loadmap next.map", "file quit leaves trailing input unread");
 }
 
+// checks file errors and verifies failed assignments preserve existing history and position
 void testFileFailures() {
     CommandFileFixture fixture("first\nsecond\n");
     bool threw = false;
@@ -422,6 +455,7 @@ void testFileFailures() {
     check(threw, "directory input reports an open or read error instead of EOF");
 }
 
+// runs checks for file readers, adapters, copying, transitions, and file errors
 void testFileCommands() {
     testFileReaderLinesAndCopies();
     testFileAdapterMatchesConsole();
@@ -432,6 +466,7 @@ void testFileCommands() {
     std::cout << "PASS: File input, adapter transitions, independent copies, EOF, and failures.\n";
 }
 
+// runs command transitions with the given processor and prints the saved history
 void demonstrateCommands(CommandProcessor& processor) {
     GameEngine engine;
     runCommandTransitions(engine, processor, std::cout);
@@ -439,6 +474,10 @@ void demonstrateCommands(CommandProcessor& processor) {
 }
 }
 
+/**
+ * testCommandProcessing() runs the command-processing checks.
+ * It also checks captured text, effects, copying, stream output, and input failures
+ */
 bool testCommandProcessing() {
     testFileCommands();
     testCommandValidation();
@@ -519,11 +558,13 @@ bool testCommandProcessing() {
     return true;
 }
 
+// demonstrates console commands using the shared transition and history output
 void demonstrateConsoleCommands() {
     CommandProcessor processor;
     demonstrateCommands(processor);
 }
 
+// demonstrates saved file commands using the shared transition and history output
 void demonstrateFileCommands(const std::string& filename) {
     FileCommandProcessorAdapter processor(filename);
     demonstrateCommands(processor);

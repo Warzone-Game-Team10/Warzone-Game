@@ -8,6 +8,7 @@ GameEngine::GameEngine() : currentState("start") {
     buildTransitions();
 }
 
+// copy constructor
 GameEngine::GameEngine(const GameEngine& other)
     : currentState(other.currentState), transitions(other.transitions) {
 }
@@ -21,6 +22,7 @@ GameEngine& GameEngine::operator=(const GameEngine& other) {
     return *this;
 }
 
+// destructor
 GameEngine::~GameEngine() {
 }
 
@@ -51,7 +53,7 @@ void GameEngine::buildTransitions() {
     transitions["win"]["quit"] = "end";
 }
 
-// processe command
+// applies a matching transition and returns false if none exists
 bool GameEngine::processCommand(const std::string& command) {
 
     //look through entries
@@ -70,17 +72,18 @@ bool GameEngine::processCommand(const std::string& command) {
 
 
 
-// reaches end state
+// returns whether the engine has reached the end state
 bool GameEngine::isFinished() const {
     return currentState == "end";
 }
 
-// prints current state
+// stream insertion operator
 std::ostream& operator<<(std::ostream& out, const GameEngine& e) {
     out << "GameEngine current state: " << e.currentState;
     return out;
 }
 
+// applies a command transition and stores its success or failure effect
 bool GameEngine::processCommand(Command& command) {
     const std::string before = currentState;
     const std::string name = command.getName();

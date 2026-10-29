@@ -2,6 +2,10 @@
 #include "GameEngineDriver.h"
 #include "CommandProcessing.h"
 
+/**
+ * runCommandTransitions reads commands through the processor and executes valid transitions.
+ * It prints command effects and stops at eof or the end state
+ */
 void runCommandTransitions(GameEngine& engine, CommandProcessor& processor, std::ostream& out) {
     out << engine << '\n';
     while (!engine.isFinished()) {
@@ -19,6 +23,7 @@ void runCommandTransitions(GameEngine& engine, CommandProcessor& processor, std:
     out << "Quit accepted. Command processing stopped.\n";
 }
 
+// demonstrates game state transitions using console commands
 void testGameStates() {
     GameEngine engine;
     CommandProcessor processor;

@@ -10,13 +10,15 @@ namespace {
 const std::string whitespace = " \t\r\n\f\v";
 }
 
-Command::Command(const std::string& text) : text(text) {}
-Command::Command(const Command& other) = default;
-Command& Command::operator=(const Command& other) = default;
-Command::~Command() = default;
+Command::Command(const std::string& text) : text(text) {} // parameterized constructor
+Command::Command(const Command& other) = default; // copy constructor
+Command& Command::operator=(const Command& other) = default; // assignment operator
+Command::~Command() = default; // destructor
 
+// returns the original command text
 const std::string& Command::getText() const { return text; }
 
+// returns the first word of the command without surrounding whitespace
 std::string Command::getName() const {
     const auto start = text.find_first_not_of(whitespace);
     if (start == std::string::npos) return "";
@@ -24,6 +26,7 @@ std::string Command::getName() const {
     return text.substr(start, end == std::string::npos ? end : end - start);
 }
 
+// returns the argument after the command name without surrounding whitespace
 std::string Command::getArgument() const {
     const auto start = text.find_first_not_of(whitespace);
     if (start == std::string::npos) return "";
@@ -34,16 +37,24 @@ std::string Command::getArgument() const {
     return text.substr(argumentStart, text.find_last_not_of(whitespace) - argumentStart + 1);
 }
 
+// returns the recorded command effect
 const std::string& Command::getEffect() const { return effect; }
+
+// stores the execution outcome or rejection message
 void Command::saveEffect(const std::string& newEffect) { effect = newEffect; }
 
+// stream insertion operator
 std::ostream& operator<<(std::ostream& out, const Command& command) {
     return out << "Command: " << command.text << "\n\nEffect: " << command.effect;
 }
 
+// default constructor
 CommandProcessor::CommandProcessor() : CommandProcessor(std::cin) {}
+
+// parameterized constructor
 CommandProcessor::CommandProcessor(std::istream& input) : input(&input) {}
 
+// copy constructor
 CommandProcessor::CommandProcessor(const CommandProcessor& other) : input(other.input) {
     history.reserve(other.history.size());
     for (const auto& command : other.history) {
@@ -51,6 +62,7 @@ CommandProcessor::CommandProcessor(const CommandProcessor& other) : input(other.
     }
 }
 
+// assignment operator
 CommandProcessor& CommandProcessor::operator=(const CommandProcessor& other) {
     if (this != &other) {
         CommandProcessor copy(other);
@@ -60,8 +72,13 @@ CommandProcessor& CommandProcessor::operator=(const CommandProcessor& other) {
     return *this;
 }
 
+// destructor
 CommandProcessor::~CommandProcessor() = default;
 
+/**
+ * CommandProcessor reads the next input line, treating eof as the end of input.
+ * Throws if reading fails for another reason
+ */
 bool CommandProcessor::readCommand(std::string& line) {
     try {
         std::getline(*input, line);
@@ -76,16 +93,22 @@ bool CommandProcessor::readCommand(std::string& line) {
     return !input->fail();
 }
 
+// saves a command in history and returns a pointer owned by the processor
 Command* CommandProcessor::saveCommand(const std::string& line) {
     history.push_back(std::make_unique<Command>(line));
     return history.back().get();
 }
 
+// reads and saves the next command, or returns nullptr at the end of input
 Command* CommandProcessor::getCommand() {
     std::string line;
     return readCommand(line) ? saveCommand(line) : nullptr;
 }
 
+/**
+ * Checks the command syntax and allowed states.
+ * Stores a rejection effect if invalid; accepted commands keep their current effect
+ */
 bool CommandProcessor::validate(Command* command, const std::string& currentState) {
     struct Rule {
         std::string name;
@@ -123,16 +146,23 @@ bool CommandProcessor::validate(Command* command, const std::string& currentStat
     return false;
 }
 
+// returns the number of saved commands
 std::size_t CommandProcessor::getCommandCount() const { return history.size(); }
+
+// returns the saved command at the given index; throws if the index is out of range
 Command* CommandProcessor::getSavedCommand(std::size_t index) { return history.at(index).get(); }
+
+// returns the saved command at the given index; throws if the index is out of range
 const Command* CommandProcessor::getSavedCommand(std::size_t index) const { return history.at(index).get(); }
 
+// stream insertion operator
 std::ostream& operator<<(std::ostream& out, const CommandProcessor& processor) {
     out << "Command history (" << processor.history.size() << "):\n\n";
     for (const auto& command : processor.history) out << *command << "\n\n";
     return out;
 }
 
+// parameterized constructor
 FileLineReader::FileLineReader(const std::string& filename)
     : filename(std::filesystem::absolute(filename).string()),
       input(std::make_unique<std::ifstream>()),
@@ -147,6 +177,7 @@ FileLineReader::FileLineReader(const std::string& filename)
     }
 }
 
+// copy constructor
 FileLineReader::FileLineReader(const FileLineReader& other) : FileLineReader(other.filename) {
     nextPosition = other.nextPosition;
     exhausted = other.exhausted;
@@ -158,6 +189,7 @@ FileLineReader::FileLineReader(const FileLineReader& other) : FileLineReader(oth
     }
 }
 
+// assignment operator
 FileLineReader& FileLineReader::operator=(const FileLineReader& other) {
     if (this != &other) {
         FileLineReader copy(other);
@@ -169,8 +201,13 @@ FileLineReader& FileLineReader::operator=(const FileLineReader& other) {
     return *this;
 }
 
+// destructor
 FileLineReader::~FileLineReader() = default;
 
+/**
+ * FileLineReader reads the next file line and tracks the position for reader copies.
+ * Returns false at eof and throws on a read or position failure
+ */
 bool FileLineReader::readLineFromFile(std::string& line) {
     if (exhausted) return false;
     std::getline(*input, line);
@@ -188,16 +225,20 @@ bool FileLineReader::readLineFromFile(std::string& line) {
     return true;
 }
 
+// stream insertion operator
 std::ostream& operator<<(std::ostream& out, const FileLineReader& reader) {
     return out << "Command file: " << reader.filename << "\nExhausted: " << reader.exhausted;
 }
 
+// parameterized constructor
 FileCommandProcessorAdapter::FileCommandProcessorAdapter(const std::string& filename)
     : reader(std::make_unique<FileLineReader>(filename)) {}
 
+// copy constructor
 FileCommandProcessorAdapter::FileCommandProcessorAdapter(const FileCommandProcessorAdapter& other)
     : CommandProcessor(other), reader(std::make_unique<FileLineReader>(*other.reader)) {}
 
+// assignment operator
 FileCommandProcessorAdapter& FileCommandProcessorAdapter::operator=(const FileCommandProcessorAdapter& other) {
     if (this != &other) {
         auto replacement = std::make_unique<FileLineReader>(*other.reader);
@@ -207,12 +248,15 @@ FileCommandProcessorAdapter& FileCommandProcessorAdapter::operator=(const FileCo
     return *this;
 }
 
+// destructor
 FileCommandProcessorAdapter::~FileCommandProcessorAdapter() = default;
 
+// reads the next command line through the file reader
 bool FileCommandProcessorAdapter::readCommand(std::string& line) {
     return reader->readLineFromFile(line);
 }
 
+// stream insertion operator
 std::ostream& operator<<(std::ostream& out, const FileCommandProcessorAdapter& adapter) {
     return out << *adapter.reader << '\n' << static_cast<const CommandProcessor&>(adapter);
 }
