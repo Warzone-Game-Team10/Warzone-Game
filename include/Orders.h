@@ -11,10 +11,11 @@
 
 class Player;
 class Territory;
+#include "LoggingObserver.h"
 
 //============================= Blueprint for the (parent) Order class =============================
 
-class Order{
+class Order : public ILoggable, public Subject{ // Inheriting the interface ILoggable
 
 public: 
 
@@ -41,6 +42,7 @@ public:
     virtual void rebindContext(const Player* original, Player* destination,
                               const std::unordered_map<int, Territory*>& territories);
 
+    string stringToLog( )override; // Inheriting the function from ILoggable
 
 protected:
 
@@ -223,7 +225,7 @@ private:
 
 // this handles the player's list of orders 
 
-class OrdersList {
+class OrdersList : public ILoggable, public Subject { // Inheriting the interface ILoggable
 public: 
 
     OrdersList();                           // default constructor 
@@ -250,6 +252,7 @@ public:
     // Borrows an order without transferring ownership; throws std::out_of_range for an invalid index.
     Order* getOrder(int index);
 
+    string stringToLog( )override; // Inheriting the function from ILoggable
 
 private: 
     // this is a dynamic vector holding POINTERS to order objects

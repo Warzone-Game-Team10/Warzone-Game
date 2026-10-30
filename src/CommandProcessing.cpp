@@ -41,12 +41,17 @@ std::string Command::getArgument() const {
 const std::string& Command::getEffect() const { return effect; }
 
 // stores the execution outcome or rejection message
-void Command::saveEffect(const std::string& newEffect) { effect = newEffect; }
+void Command::saveEffect(const std::string& newEffect) { 
+    effect = newEffect; 
+    notify(this);// notify observer
+}
 
 // stream insertion operator
 std::ostream& operator<<(std::ostream& out, const Command& command) {
     return out << "Command: " << command.text << "\n\nEffect: " << command.effect;
 }
+
+
 
 // default constructor
 CommandProcessor::CommandProcessor() : CommandProcessor(std::cin) {}
@@ -96,6 +101,7 @@ bool CommandProcessor::readCommand(std::string& line) {
 // saves a command in history and returns a pointer owned by the processor
 Command* CommandProcessor::saveCommand(const std::string& line) {
     history.push_back(std::make_unique<Command>(line));
+    notify(this);// notify observer
     return history.back().get();
 }
 
@@ -163,6 +169,10 @@ std::ostream& operator<<(std::ostream& out, const CommandProcessor& processor) {
     out << "Command history (" << processor.history.size() << "):\n\n";
     for (const auto& command : processor.history) out << *command << "\n\n";
     return out;
+}
+
+string CommandProcessor::stringToLog( ){
+    return "Comman Processing: ";
 }
 
 // parameterized constructor
@@ -262,4 +272,10 @@ bool FileCommandProcessorAdapter::readCommand(std::string& line) {
 // stream insertion operator
 std::ostream& operator<<(std::ostream& out, const FileCommandProcessorAdapter& adapter) {
     return out << *adapter.reader << '\n' << static_cast<const CommandProcessor&>(adapter);
+}
+
+
+//Logging Observer part
+string Command::stringToLog( ){
+    return "Comman: ";
 }
