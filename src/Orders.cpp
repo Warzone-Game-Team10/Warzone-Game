@@ -148,6 +148,7 @@ void OrdersList::rebindContext(const Player* original, Player* destination,
     }
 }
 
+
 // ------------------- VALIDATE +  EXECUTE METHODS  ------------------- 
 
 //VALIDATE METHOD : 
@@ -182,6 +183,7 @@ void Order::execute() {
     if (validateExecution()) {
         recordEffect("execution of " + *description);
     }
+    notify(this);// notify observer
 }
 
 //=============================================================================================
@@ -247,6 +249,9 @@ void Deploy::execute() {
     if (validateExecution()) {
         recordEffect("deployment of " + std::to_string(armyCount) + " armies to " + target->getName());
     }
+    
+    notify(this);// notify observer
+
 }
 
 
@@ -314,6 +319,8 @@ void Advance::execute() {
     if (validateExecution()) {
         recordEffect("advance of " + std::to_string(armyCount) + " armies from " + source->getName() + " to " + target->getName());
     }
+    notify(this);// notify observer
+
 }
 
 
@@ -385,6 +392,9 @@ void Bomb::execute() {
     if (validateExecution()) {
         recordEffect("bombing of " + target->getName());
     }
+
+    notify(this);// notify observer
+
 }
 
 
@@ -448,6 +458,9 @@ void Blockade::execute() {
     if (validateExecution()) {
         recordEffect("blockade of " + target->getName());
     }
+    
+    notify(this);// notify observer
+
 }
 
 
@@ -506,6 +519,9 @@ void Airlift::execute() {
     if (validateExecution()) {
         recordEffect("airlift of " + std::to_string(armyCount) + " armies from " + source->getName() + " to " + target->getName());
     }
+    
+    notify(this);// notify observer
+
 }
 
 
@@ -559,6 +575,9 @@ void Negotiate::execute() {
     if (validateExecution()) {
         recordEffect("negotiation between " + issuer->getName() + " and " + partner->getName());
     }
+    
+    notify(this);// notify observer
+
 }
 
 
@@ -630,6 +649,7 @@ void OrdersList::addOrder(Order* newOrder) {
     if (newOrder != nullptr) {
         list.push_back(newOrder); // this puts the order pointer onto the back of the queue
     }
+    notify(this);// notify observer
 }
 
 
@@ -728,8 +748,15 @@ std::ostream& operator<<(std::ostream& outs, const OrdersList& list) {
 
 
 
+//Logging Observer part
 
 
+string OrdersList::stringToLog( ){
+    return "OrderList: " ;
+}
+string Order::stringToLog( ){
+    return "Order: " ;
+}
 
 
 

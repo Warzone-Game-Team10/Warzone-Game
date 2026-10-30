@@ -6,10 +6,12 @@
 #include <string>
 #include <vector>
 
+#include "LoggingObserver.h"
+
 /**
  * The Command class stores a game command and its recorded effect
  */
-class Command {
+class Command: public ILoggable, public Subject {
 private:
     std::string text;
     std::string effect;
@@ -28,12 +30,15 @@ public:
 
     // stream insertion operator
     friend std::ostream& operator<<(std::ostream& out, const Command& command);
+
+    string stringToLog( )override; // Inheriting the function from ILoggable
+
 };
 
 /**
  * The CommandProcessor class reads, stores, and validates game commands
  */
-class CommandProcessor {
+class CommandProcessor : public ILoggable, Subject {
 private:
     std::istream* input;
     std::vector<std::unique_ptr<Command>> history;
@@ -69,6 +74,9 @@ public:
 
     // stream insertion operator
     friend std::ostream& operator<<(std::ostream& out, const CommandProcessor& processor);
+
+    std::string stringToLog( )override; // Inheriting the function from ILoggable
+
 };
 
 /**

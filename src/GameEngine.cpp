@@ -98,3 +98,8 @@ bool GameEngine::processCommand(Command& command) {
                        ": '" + before + "' -> '" + currentState + "'.");
     return true;
 }
+
+//Logging Observer part
+string GameEngine::stringToLog( ){
+    return "Game Engine: " + currentState;
+}

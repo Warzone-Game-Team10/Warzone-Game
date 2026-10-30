@@ -4,10 +4,12 @@
 #include <map>
 #include <string>
 
-class Command;
+#include "LoggingObserver.h"
+
+class Command ;
 
 // GAME ENGINE: controls flow of the game with state, transition & command
-class GameEngine {
+class GameEngine : public ILoggable, public Subject{
 private:
     std::string currentState;
 
@@ -37,4 +39,7 @@ public:
 
     // stream insertion operator
     friend std::ostream& operator<<(std::ostream& out, const GameEngine& e);
+
+    string stringToLog( )override; // Inheriting the function from ILoggable
+
 };
