@@ -1,0 +1,12 @@
+validatemap
+loadmap
+loadmap demo.map
+loadmap replacement.map
+validatemap extra
+validatemap
+addplayer Jane
+addplayer John
+gamestart
+win
+replay
+quit

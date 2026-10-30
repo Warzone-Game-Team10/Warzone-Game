@@ -1,24 +1,31 @@
 #include "GameEngine.h"
 #include "GameEngineDriver.h"
+#include "CommandProcessing.h"
 
-// type command until game reaches the end
-// only valid cmds, if invalid then error
+/**
+ * runCommandTransitions reads commands through the processor and executes valid transitions.
+ * It prints command effects and stops at eof or the end state
+ */
+void runCommandTransitions(GameEngine& engine, CommandProcessor& processor, std::ostream& out) {
+    out << engine << '\n';
+    while (!engine.isFinished()) {
+        out << "\n[" << engine.getCurrentStateName() << "] Enter command: " << std::flush;
+        Command* command = processor.getCommand();
+        if (!command) {
+            out << "End of input. Command processing stopped.\n";
+            return;
+        }
+        if (processor.validate(command, engine.getCurrentStateName())) {
+            engine.processCommand(*command);
+        }
+        out << '\n' << *command << '\n';
+    }
+    out << "Quit accepted. Command processing stopped.\n";
+}
+
+// demonstrates game state transitions using console commands
 void testGameStates() {
     GameEngine engine;
-    std::string command;
-
-    std::cout << engine << std::endl;
-
-    while (!engine.isFinished()) {
-        std::cout << "\n[" << engine.getCurrentStateName() << "] Enter command: ";
-
-        
-        if (!(std::cin >> command)) {
-            break;
-        }
-
-        engine.processCommand(command);
-    }
-
-    std::cout << "Game finished." << std::endl;
+    CommandProcessor processor;
+    runCommandTransitions(engine, processor, std::cout);
 }
