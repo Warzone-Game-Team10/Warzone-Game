@@ -31,14 +31,14 @@ public:
     // stream insertion operator
     friend std::ostream& operator<<(std::ostream& out, const Command& command);
 
-    string stringToLog( )override; // Inheriting the function from ILoggable
+    string stringToLog() const override; // Inheriting the function from ILoggable
 
 };
 
 /**
  * The CommandProcessor class reads, stores, and validates game commands
  */
-class CommandProcessor : public ILoggable, Subject {
+class CommandProcessor : public ILoggable, public Subject {
 private:
     std::istream* input;
     std::vector<std::unique_ptr<Command>> history;
@@ -75,7 +75,7 @@ public:
     // stream insertion operator
     friend std::ostream& operator<<(std::ostream& out, const CommandProcessor& processor);
 
-    std::string stringToLog( )override; // Inheriting the function from ILoggable
+    string stringToLog() const override; // Inheriting the function from ILoggable
 
 };
 

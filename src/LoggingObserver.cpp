@@ -1,94 +1,139 @@
 #include "LoggingObserver.h"
 #include <algorithm>
 #include <fstream>
+#include <vector>
+
 
 namespace {
     //filename to writ elogs into
     const char* const LOG_FILE_NAME = "gamelog.txt";
 }
+using namespace std; 
 
-// ---------- ILoggable ----------
-
+// ======== ILoggable -INTERFACE ===========
 ILoggable::~ILoggable() {}
+//no need for dtringToLog since it interface
 
-// ---------- Observer ----------
-
+// =========== Observer -INTERFACE===========
 Observer::~Observer() {}
 
-// ---------- Subject ----------
+
+// =========== Subject ===========
 
 /** Creates a subject with an empty observer list. */
-Subject::Subject() : observers(new std::vector<Observer*>()) {}
+Subject::Subject() {
+    observers = new vector<Observer*>();    
+}
 
-/** Deep copy: new vector, same (non-owned) observer pointers. */
-Subject::Subject(const Subject& other)
-    : observers(new std::vector<Observer*>(*other.observers)) {}
+// Deep copy
+Subject::Subject(const Subject& other){
+    observers = new vector<Observer*>();
 
-/** Deep copy assignment: reuses our own vector and copies the contents. */
+    //size_t is int type to represent the size of any obj in memory. SO it will be large enough for sizes of vetor
+    for (size_t count =0; count < other.observers->size(); count++){
+        //add to new observer vector
+        observers->push_back((*other.observers)[count]);
+    }
+
+}
+
+
 Subject& Subject::operator=(const Subject& other) {
+    //if theirnot equal
     if (this != &other) {
-        *observers = *other.observers;
+        observers->clear();
+ 
+        //deep copy
+        for (size_t i = 0; i < other.observers->size(); i++) {
+            observers->push_back((*other.observers)[i]);
+        }
     }
     return *this;
 }
 
-/** Deletes the list only; the observers belong to whoever created them. */
+//destructor
 Subject::~Subject() {
     delete observers;
+    observers=nullptr;
 }
 
-/** Registers an observer so it gets notified of changes. */
+//Registers an observer so it gets notified of changes.
 void Subject::attach(Observer* observer) {
-    if (observer == nullptr) return;
-    // avoid attaching the same observer twice (it would log every line twice)
-    if (std::find(observers->begin(), observers->end(), observer) == observers->end()) {
-        observers->push_back(observer);
+   
+    if (observer == nullptr) {
+        return;
     }
+    // avoid attaching the same observer twice 
+    for (size_t i = 0; i < observers->size(); i++) {
+        if ((*observers)[i] == observer) {
+            return;
+        }
+    }
+ 
+    //add observer to the list
+    observers->push_back(observer);
 }
 
-/** Unregisters an observer. */
+// Removes an observer from the list (does nothing if it is not in the list).
 void Subject::detach(Observer* observer) {
-    observers->erase(std::remove(observers->begin(), observers->end(), observer),
-                     observers->end());
-}
-
-/** Calls update() on every attached observer. */
-void Subject::notify(ILoggable* loggable) {
-    for (Observer* observer : *observers) {
-        observer->update(loggable);
+    for (size_t i = 0; i < observers->size(); i++) {
+        if ((*observers)[i] == observer) {
+            observers->erase(observers->begin() + i);
+            return;
+        }
     }
 }
 
-/** Read-only access to the list, used to pass observers to child objects. */
+// Calls update() on every attached observer.
+void Subject::notify(ILoggable* loggable) {
+    for (size_t i = 0; i < observers->size(); i++) {
+        (*observers)[i]->update(loggable);
+    }
+}
+
+// getter
 const std::vector<Observer*>& Subject::getObservers() const {
     return *observers;
 }
 
+// Stream insertion operator for Subject.
 std::ostream& operator<<(std::ostream& os, const Subject& subject) {
     os << "Subject with " << subject.observers->size() << " observer(s)";
     return os;
 }
 
-// ---------- LogObserver ----------
+// =========== LogObserver ==========
 
-/** Starts a fresh log: the file is emptied once when the observer is created. */
+//Starts a fresh log: the file is emptied once when the observer is created. 
 LogObserver::LogObserver() {
     std::ofstream out(LOG_FILE_NAME, std::ios::trunc);
 }
 
-/** Copying must not erase the log, so nothing happens here. */
-LogObserver::LogObserver(const LogObserver& other) : Observer(other) {}
 
+// Copy constructor. It must NOT empty the file, so it does not open it.
+LogObserver::LogObserver(const LogObserver& other) : Observer(other) {
+}
+ 
+// Assignment operator. LogObserver has no data of its own to copy.
 LogObserver& LogObserver::operator=(const LogObserver& other) {
-    Observer::operator=(other);
+    if (this != &other) {
+        Observer::operator=(other);
+    }
+ 
     return *this;
 }
+ 
+// Destructor.
+LogObserver::~LogObserver() {
+}
 
-LogObserver::~LogObserver() {}
-
-/** Appends the loggable's text to gamelog.txt. */
-void LogObserver::update(ILoggable* loggable) {
-    if (loggable == nullptr) return;
+// Called by Subject::notify(); stringToLog() runs the version of the real class
+void LogObserver::update(ILoggable* loggable) const{
+    if (loggable == nullptr) {
+        return;
+    }
+ 
+    // Appends the text of the loggable object to gamelog.txt. it gets the text to log from stringToLog() inherited from other classes
     std::ofstream out(LOG_FILE_NAME, std::ios::app);
     out << loggable->stringToLog() << std::endl;
 }

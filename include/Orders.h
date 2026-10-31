@@ -42,7 +42,7 @@ public:
     virtual void rebindContext(const Player* original, Player* destination,
                               const std::unordered_map<int, Territory*>& territories);
 
-    string stringToLog( )override; // Inheriting the function from ILoggable
+    string stringToLog() const override; // Inheriting the function from ILoggable
 
 protected:
 
@@ -252,7 +252,7 @@ public:
     // Borrows an order without transferring ownership; throws std::out_of_range for an invalid index.
     Order* getOrder(int index);
 
-    string stringToLog( )override; // Inheriting the function from ILoggable
+    string stringToLog() const override; // Inheriting the function from ILoggable
 
 private: 
     // this is a dynamic vector holding POINTERS to order objects

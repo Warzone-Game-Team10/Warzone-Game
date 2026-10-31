@@ -60,7 +60,7 @@ CommandProcessor::CommandProcessor() : CommandProcessor(std::cin) {}
 CommandProcessor::CommandProcessor(std::istream& input) : input(&input) {}
 
 // copy constructor
-CommandProcessor::CommandProcessor(const CommandProcessor& other) : input(other.input) {
+CommandProcessor::CommandProcessor(const CommandProcessor& other) : input(other.input), Subject(other) {
     history.reserve(other.history.size());
     for (const auto& command : other.history) {
         history.push_back(std::make_unique<Command>(*command));
@@ -70,6 +70,7 @@ CommandProcessor::CommandProcessor(const CommandProcessor& other) : input(other.
 // assignment operator
 CommandProcessor& CommandProcessor::operator=(const CommandProcessor& other) {
     if (this != &other) {
+        Subject::operator=(other); 
         CommandProcessor copy(other);
         history.swap(copy.history);
         input = other.input;
@@ -171,9 +172,7 @@ std::ostream& operator<<(std::ostream& out, const CommandProcessor& processor) {
     return out;
 }
 
-string CommandProcessor::stringToLog( ){
-    return "Comman Processing: ";
-}
+
 
 // parameterized constructor
 FileLineReader::FileLineReader(const std::string& filename)
@@ -275,7 +274,17 @@ std::ostream& operator<<(std::ostream& out, const FileCommandProcessorAdapter& a
 }
 
 
-//Logging Observer part
-string Command::stringToLog( ){
-    return "Comman: ";
+// ======== Logging Observer part ========
+
+//Text logged when a command's effect is saved. 
+std::string Command::stringToLog() const {
+    return "SaveEffect: " + effect;
+}
+
+//Text logged when a command is saved: only the newest command.
+std::string CommandProcessor::stringToLog() const {
+    if (history.empty()){
+      return "Command: (none)";  
+    } 
+    return "SaveCommand(): " + history.back()->getText();
 }

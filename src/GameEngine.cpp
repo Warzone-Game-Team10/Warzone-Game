@@ -10,12 +10,13 @@ GameEngine::GameEngine() : currentState("start") {
 
 // copy constructor
 GameEngine::GameEngine(const GameEngine& other)
-    : currentState(other.currentState), transitions(other.transitions) {
+    : Subject(other),currentState(other.currentState), transitions(other.transitions) {
 }
 
 // assignment operator
 GameEngine& GameEngine::operator=(const GameEngine& other) {
     if (this != &other) {
+        Subject::operator=(other);
         currentState = other.currentState;
         transitions = other.transitions;
     }
@@ -100,6 +101,6 @@ bool GameEngine::processCommand(Command& command) {
 }
 
 //Logging Observer part
-string GameEngine::stringToLog( ){
+string GameEngine::stringToLog( ) const{
     return "Game Engine: " + currentState;
 }

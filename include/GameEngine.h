@@ -40,6 +40,6 @@ public:
     // stream insertion operator
     friend std::ostream& operator<<(std::ostream& out, const GameEngine& e);
 
-    string stringToLog( )override; // Inheriting the function from ILoggable
+    string stringToLog() const override; // Inheriting the function from ILoggable
 
 };

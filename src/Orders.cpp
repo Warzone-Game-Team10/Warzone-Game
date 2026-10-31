@@ -4,6 +4,7 @@
 #include <memory>
 #include <string>
 #include <utility>
+#include <filesystem> //used for std::ostringstream text; in stringToLog function
 
 //==========================================================================================
 //                  1. PARENT CLASS ( ORDER ) IMPLEMENTATION 
@@ -20,7 +21,7 @@ Order::Order() : description(nullptr), effect(nullptr), executed(false) {
 
 // ---------- COPY CONSTRUCTOR (DEEP COPY) ----------
 // Copies own their description and effect strings, but subclasses still borrow players and territories.
-Order::Order(const Order& other) : description(nullptr), effect(nullptr), executed(other.executed) {
+Order::Order(const Order& other) :  Subject(other),description(nullptr), effect(nullptr), executed(other.executed) {
     std::unique_ptr<std::string> text(other.description ? new std::string(*other.description) : nullptr);
     effect = new std::string(*other.effect);
     description = text.release();
@@ -32,10 +33,11 @@ Order::~Order() {
     delete effect;
 }
 
-// ---------- ASSIGNMENT OPERATOR ----------
+// ---------- ASSIGNMENT OPERATOR ---------- 
 Order& Order::operator=(const Order& other) {
     if (this != &other) {
         // Finish allocating both strings before replacing any existing state.
+        Subject::operator=(other);
         Order copy(other);
         std::swap(description, copy.description);
         std::swap(effect, copy.effect);
@@ -601,7 +603,7 @@ OrdersList::OrdersList(){
 
 
 // copy constructor ( deep copy!! )
-OrdersList::OrdersList( const OrdersList& other){
+OrdersList::OrdersList( const OrdersList& other) : Subject(other){
     try {
         for (const Order* order : other.list) {
             // Keep ownership until insertion succeeds, including allocation failures.
@@ -635,6 +637,7 @@ OrdersList::~OrdersList() {
 // assignment operator 
 OrdersList& OrdersList::operator=(const OrdersList& other) {
     if (this != &other) {
+        Subject::operator=(other);
         // Build the complete copy before replacing the destination's orders.
         OrdersList replacement(other);
         list.swap(replacement.list);
@@ -750,12 +753,17 @@ std::ostream& operator<<(std::ostream& outs, const OrdersList& list) {
 
 //Logging Observer part
 
-
-string OrdersList::stringToLog( ){
-    return "OrderList: " ;
+// text logged when an order is added: only the newest order
+std::string OrdersList::stringToLog() const {
+    if (list.empty() || list.back() == nullptr) return "Order Issued: (none)";
+    std::ostringstream text;
+    text << "AddOrder(): " << *list.back();
+    return text.str();
 }
-string Order::stringToLog( ){
-    return "Order: " ;
+
+// text logged when an order is executed
+std::string Order::stringToLog() const {
+    return "Order Executed: " + *effect;
 }
 
 
