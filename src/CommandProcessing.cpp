@@ -41,12 +41,17 @@ std::string Command::getArgument() const {
 const std::string& Command::getEffect() const { return effect; }
 
 // stores the execution outcome or rejection message
-void Command::saveEffect(const std::string& newEffect) { effect = newEffect; }
+void Command::saveEffect(const std::string& newEffect) { 
+    effect = newEffect; 
+    notify(this);// notify observer
+}
 
 // stream insertion operator
 std::ostream& operator<<(std::ostream& out, const Command& command) {
     return out << "Command: " << command.text << "\n\nEffect: " << command.effect;
 }
+
+
 
 // default constructor
 CommandProcessor::CommandProcessor() : CommandProcessor(std::cin) {}
@@ -55,7 +60,7 @@ CommandProcessor::CommandProcessor() : CommandProcessor(std::cin) {}
 CommandProcessor::CommandProcessor(std::istream& input) : input(&input) {}
 
 // copy constructor
-CommandProcessor::CommandProcessor(const CommandProcessor& other) : input(other.input) {
+CommandProcessor::CommandProcessor(const CommandProcessor& other) : input(other.input), Subject(other) {
     history.reserve(other.history.size());
     for (const auto& command : other.history) {
         history.push_back(std::make_unique<Command>(*command));
@@ -65,6 +70,7 @@ CommandProcessor::CommandProcessor(const CommandProcessor& other) : input(other.
 // assignment operator
 CommandProcessor& CommandProcessor::operator=(const CommandProcessor& other) {
     if (this != &other) {
+        Subject::operator=(other); 
         CommandProcessor copy(other);
         history.swap(copy.history);
         input = other.input;
@@ -96,6 +102,7 @@ bool CommandProcessor::readCommand(std::string& line) {
 // saves a command in history and returns a pointer owned by the processor
 Command* CommandProcessor::saveCommand(const std::string& line) {
     history.push_back(std::make_unique<Command>(line));
+    notify(this);// notify observer
     return history.back().get();
 }
 
@@ -164,6 +171,8 @@ std::ostream& operator<<(std::ostream& out, const CommandProcessor& processor) {
     for (const auto& command : processor.history) out << *command << "\n\n";
     return out;
 }
+
+
 
 // parameterized constructor
 FileLineReader::FileLineReader(const std::string& filename)
@@ -262,4 +271,20 @@ bool FileCommandProcessorAdapter::readCommand(std::string& line) {
 // stream insertion operator
 std::ostream& operator<<(std::ostream& out, const FileCommandProcessorAdapter& adapter) {
     return out << *adapter.reader << '\n' << static_cast<const CommandProcessor&>(adapter);
+}
+
+
+// ======== Logging Observer part ========
+
+//Text logged when a command's effect is saved. 
+std::string Command::stringToLog() const {
+    return "SaveEffect: " + effect;
+}
+
+//Text logged when a command is saved: only the newest command.
+std::string CommandProcessor::stringToLog() const {
+    if (history.empty()){
+      return "Command: (none)";  
+    } 
+    return "SaveCommand(): " + history.back()->getText();
 }

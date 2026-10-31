@@ -4,6 +4,7 @@
 #include "OrdersDriver.h"
 #include "GameEngineDriver.h"
 #include "CommandProcessingDriver.h"
+#include "LoggingObserverDriver.h"
 
 #include <exception>
 #include <filesystem>
@@ -62,7 +63,7 @@ int main(int argc, char* argv[]) {
         const bool acceptsMapDirectory =
             command == "map" || command == "player" || command == "orders" || command == "all";
         const bool knownComponent =
-            acceptsMapDirectory || command == "cards" || command == "gameengine" || command == "commands";
+            acceptsMapDirectory || command == "cards" || command == "gameengine" || command == "commands"|| command == "logging";
         if (!knownComponent || argc > 3 ||
             (argc == 3 && (!acceptsMapDirectory || std::string_view(argv[2]).starts_with("-")))) {
             return usageError(argv[0], "Invalid driver or launch arguments.");
@@ -123,11 +124,21 @@ int main(int argc, char* argv[]) {
             passed = testCommandProcessing() && passed;
         }
 
+
+    // Part 5: Logging observer
+        if (command == "logging" || command == "all") {
+            std::cout << "\n=-=-=-=-=-=-=-= Part 5: Logging Observer =-=-=-=-=-=-=-=\n";
+
+            if (!testLoggingObserver()) {
+                passed = false;
+            }
+        }
+
         std::cout << (passed ? "\nALL SELECTED TESTS PASSED\n"
                              : "\nSELECTED TESTS FAILED\n");
 
         return passed ? 0 : 1;
-
+        
     } catch (const std::exception& error) {
         std::cerr << "FAIL: " << error.what() << '\n';
         return 1;
