@@ -4,7 +4,7 @@
 #include <memory>
 #include <string>
 #include <utility>
-#include <filesystem> //used for std::ostringstream text; in stringToLog function
+#include <sstream>//used for std::ostringstream text; in stringToLog function
 
 //==========================================================================================
 //                  1. PARENT CLASS ( ORDER ) IMPLEMENTATION 

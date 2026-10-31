@@ -5,5 +5,3 @@ SaveCommand(): addplayer Alice
 SaveCommand(): addplayer Bob
 SaveCommand(): gamestart
 SaveCommand(): wrongCommand
-AddOrder(): Order Description: Deploy Order
-AddOrder(): Order Description: Negotiate with Bob.

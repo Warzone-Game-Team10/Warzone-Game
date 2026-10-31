@@ -122,5 +122,27 @@ bool testLoggingObserver() {
     logObserver = nullptr;
 
 
-    return 0;
+    //to make function return if the tess pass or not
+    const std::string log = readLogFile();
+
+    const std::string expectedEntries[] = {
+        "SaveCommand(): gamestart",
+        "SaveCommand(): loadmap canada.map",
+        "SaveCommand(): validatemap",
+        "SaveCommand(): addplayer Alice",
+        "SaveCommand(): addplayer Bob",
+        "SaveCommand(): wrongCommand"
+    };
+
+    bool passed = true;
+
+    for (const std::string& entry : expectedEntries) {
+        if (!logContains(log, entry, entry)) {
+            passed = false;
+        }
+    }
+
+    return passed;
+
+    
 }
