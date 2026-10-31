@@ -1,0 +1,7 @@
+SaveCommand(): gamestart
+SaveCommand(): loadmap canada.map
+SaveCommand(): validatemap
+SaveCommand(): addplayer Alice
+SaveCommand(): addplayer Bob
+SaveCommand(): gamestart
+SaveCommand(): wrongCommand

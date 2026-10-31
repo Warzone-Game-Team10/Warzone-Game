@@ -1,5 +1,5 @@
-output: MainDriver.o MapDriver.o Map.o CardsDriver.o Cards.o Player.o PlayerDriver.o Orders.o OrdersDriver.o GameEngineDriver.o GameEngine.o CommandProcessing.o CommandProcessingDriver.o
-	g++ MainDriver.o MapDriver.o Map.o CardsDriver.o Cards.o Player.o PlayerDriver.o Orders.o OrdersDriver.o GameEngineDriver.o GameEngine.o CommandProcessing.o CommandProcessingDriver.o -o warzone-tests.exe
+output: MainDriver.o MapDriver.o Map.o CardsDriver.o Cards.o Player.o PlayerDriver.o Orders.o OrdersDriver.o GameEngineDriver.o GameEngine.o CommandProcessing.o CommandProcessingDriver.o LoggingObserver.o LoggingObserverDriver.o
+	g++ MainDriver.o MapDriver.o Map.o CardsDriver.o Cards.o Player.o PlayerDriver.o Orders.o OrdersDriver.o GameEngineDriver.o GameEngine.o CommandProcessing.o CommandProcessingDriver.o LoggingObserver.o LoggingObserverDriver.o -o warzone-tests.exe
 
 MainDriver.o: src/MainDriver.cpp include/MapDriver.h include/CardsDriver.h include/PlayerDriver.h include/OrdersDriver.h include/GameEngineDriver.h include/CommandProcessingDriver.h
 	g++ -std=c++20 -Iinclude -c src/MainDriver.cpp -o MainDriver.o
@@ -40,6 +40,12 @@ CommandProcessing.o: src/CommandProcessing.cpp include/CommandProcessing.h
 CommandProcessingDriver.o: src/CommandProcessingDriver.cpp include/CommandProcessingDriver.h include/CommandProcessing.h include/GameEngine.h include/GameEngineDriver.h
 	g++ -std=c++20 -Iinclude -c src/CommandProcessingDriver.cpp -o CommandProcessingDriver.o
 
+LoggingObserver.o: src/LoggingObserver.cpp
+	g++ -std=c++20 -Iinclude -c src/LoggingObserver.cpp -o LoggingObserver.o
+
+LoggingObserverDriver.o: src/LoggingObserverDriver.cpp
+	g++ -std=c++20 -Iinclude -c src/LoggingObserverDriver.cpp -o LoggingObserverDriver.o
+
 run: output
 	./warzone-tests.exe all
 
@@ -48,5 +54,8 @@ run-engine: output
 
 clean:
 	del /Q *.o warzone-tests.exe 2>NUL
+
+clear: 
+	rm -f *.o warzone-tests.exe	
 
 .PHONY: run run-engine clean

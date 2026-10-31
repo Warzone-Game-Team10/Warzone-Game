@@ -4,6 +4,7 @@
 #include <memory>
 #include <string>
 #include <utility>
+#include <sstream>//used for std::ostringstream text; in stringToLog function
 
 //==========================================================================================
 //                  1. PARENT CLASS ( ORDER ) IMPLEMENTATION 
@@ -20,7 +21,7 @@ Order::Order() : description(nullptr), effect(nullptr), executed(false) {
 
 // ---------- COPY CONSTRUCTOR (DEEP COPY) ----------
 // Copies own their description and effect strings, but subclasses still borrow players and territories.
-Order::Order(const Order& other) : description(nullptr), effect(nullptr), executed(other.executed) {
+Order::Order(const Order& other) :  Subject(other),description(nullptr), effect(nullptr), executed(other.executed) {
     std::unique_ptr<std::string> text(other.description ? new std::string(*other.description) : nullptr);
     effect = new std::string(*other.effect);
     description = text.release();
@@ -32,10 +33,11 @@ Order::~Order() {
     delete effect;
 }
 
-// ---------- ASSIGNMENT OPERATOR ----------
+// ---------- ASSIGNMENT OPERATOR ---------- 
 Order& Order::operator=(const Order& other) {
     if (this != &other) {
         // Finish allocating both strings before replacing any existing state.
+        Subject::operator=(other);
         Order copy(other);
         std::swap(description, copy.description);
         std::swap(effect, copy.effect);
@@ -148,6 +150,7 @@ void OrdersList::rebindContext(const Player* original, Player* destination,
     }
 }
 
+
 // ------------------- VALIDATE +  EXECUTE METHODS  ------------------- 
 
 //VALIDATE METHOD : 
@@ -182,6 +185,7 @@ void Order::execute() {
     if (validateExecution()) {
         recordEffect("execution of " + *description);
     }
+    notify(this);// notify observer
 }
 
 //=============================================================================================
@@ -247,6 +251,9 @@ void Deploy::execute() {
     if (validateExecution()) {
         recordEffect("deployment of " + std::to_string(armyCount) + " armies to " + target->getName());
     }
+    
+    notify(this);// notify observer
+
 }
 
 
@@ -314,6 +321,8 @@ void Advance::execute() {
     if (validateExecution()) {
         recordEffect("advance of " + std::to_string(armyCount) + " armies from " + source->getName() + " to " + target->getName());
     }
+    notify(this);// notify observer
+
 }
 
 
@@ -385,6 +394,9 @@ void Bomb::execute() {
     if (validateExecution()) {
         recordEffect("bombing of " + target->getName());
     }
+
+    notify(this);// notify observer
+
 }
 
 
@@ -448,6 +460,9 @@ void Blockade::execute() {
     if (validateExecution()) {
         recordEffect("blockade of " + target->getName());
     }
+    
+    notify(this);// notify observer
+
 }
 
 
@@ -506,6 +521,9 @@ void Airlift::execute() {
     if (validateExecution()) {
         recordEffect("airlift of " + std::to_string(armyCount) + " armies from " + source->getName() + " to " + target->getName());
     }
+    
+    notify(this);// notify observer
+
 }
 
 
@@ -559,6 +577,9 @@ void Negotiate::execute() {
     if (validateExecution()) {
         recordEffect("negotiation between " + issuer->getName() + " and " + partner->getName());
     }
+    
+    notify(this);// notify observer
+
 }
 
 
@@ -582,7 +603,7 @@ OrdersList::OrdersList(){
 
 
 // copy constructor ( deep copy!! )
-OrdersList::OrdersList( const OrdersList& other){
+OrdersList::OrdersList( const OrdersList& other) : Subject(other){
     try {
         for (const Order* order : other.list) {
             // Keep ownership until insertion succeeds, including allocation failures.
@@ -616,6 +637,7 @@ OrdersList::~OrdersList() {
 // assignment operator 
 OrdersList& OrdersList::operator=(const OrdersList& other) {
     if (this != &other) {
+        Subject::operator=(other);
         // Build the complete copy before replacing the destination's orders.
         OrdersList replacement(other);
         list.swap(replacement.list);
@@ -630,6 +652,7 @@ void OrdersList::addOrder(Order* newOrder) {
     if (newOrder != nullptr) {
         list.push_back(newOrder); // this puts the order pointer onto the back of the queue
     }
+    notify(this);// notify observer
 }
 
 
@@ -728,8 +751,20 @@ std::ostream& operator<<(std::ostream& outs, const OrdersList& list) {
 
 
 
+//Logging Observer part
 
+// text logged when an order is added: only the newest order
+std::string OrdersList::stringToLog() const {
+    if (list.empty() || list.back() == nullptr) return "Order Issued: (none)";
+    std::ostringstream text;
+    text << "AddOrder(): " << *list.back();
+    return text.str();
+}
 
+// text logged when an order is executed
+std::string Order::stringToLog() const {
+    return "Order Executed: " + *effect;
+}
 
 
 
