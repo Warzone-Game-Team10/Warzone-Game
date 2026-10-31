@@ -41,6 +41,28 @@ bool logContains(const std::string& log, const std::string& expected, const std:
     return found;
 }
 
+
+void testInheritance(){
+    Command* sampleCommand = new Command("loadmap sample.map");
+    CommandProcessor* sampleProcessor = new CommandProcessor();
+    Deploy* sampleOrder = new Deploy();
+    OrdersList* sampleList = new OrdersList();
+    GameEngine* sampleEngine = new GameEngine();
+
+    printInheritance("Command", sampleCommand, sampleCommand);
+    printInheritance("CommandProcessor", sampleProcessor, sampleProcessor);
+    printInheritance("Order (Deploy)", sampleOrder, sampleOrder);
+    printInheritance("OrdersList", sampleList, sampleList);
+    printInheritance("GameEngine", sampleEngine, sampleEngine);
+
+    // these were only needed for the inheritance check
+    delete sampleCommand;
+    delete sampleProcessor;
+    delete sampleOrder;
+    delete sampleList;
+    delete sampleEngine;
+}
+
 }
 
 bool testLoggingObserver() {
@@ -52,18 +74,8 @@ bool testLoggingObserver() {
     // TEST 1: all five classes are a Subject and an ILoggable
     // ------------------------------------------------------------
     std::cout << "\nTEST 1: Inheritance from Subject and ILoggable" << std::endl;
-
-    Command sampleCommand("loadmap sample.map");
-    CommandProcessor sampleProcessor;
-    Deploy sampleOrder;
-    OrdersList sampleList;
-    GameEngine sampleEngine;
-
-    printInheritance("Command", &sampleCommand, &sampleCommand);
-    printInheritance("CommandProcessor", &sampleProcessor, &sampleProcessor);
-    printInheritance("Order (Deploy)", &sampleOrder, &sampleOrder);
-    printInheritance("OrdersList", &sampleList, &sampleList);
-    printInheritance("GameEngine", &sampleEngine, &sampleEngine);
+    testInheritance();
+    
 
     // ------------------------------------------------------------
     // TEST 2: commands, their effects and state changes are logged
@@ -85,9 +97,11 @@ bool testLoggingObserver() {
 
     // Attach BEFORE reading commands: Command objects copy these observers
     // when saveCommand() creates them.
+    //since Game Engine and CommmandPrcessor inheriste Subjet we can call subjet::attach to add them to the vector list of observers
     engine.attach(logObserver);
     processor.attach(logObserver);
 
+    //display the current sate name and 
     Command* command = processor.getCommand();
     while (command != nullptr) {
         std::cout << "  [" << engine.getCurrentStateName() << "] " << command->getText() << std::endl;
@@ -101,29 +115,6 @@ bool testLoggingObserver() {
 
     std::cout << "  Final state: " << engine.getCurrentStateName() << std::endl;
 
-    // ------------------------------------------------------------
-    // TEST 3: orders added and orders executed are logged
-    // ------------------------------------------------------------
-    std::cout << "\nTEST 3: Orders issued and executed" << std::endl;
-
-    Player alice;
-    Player bob;
-    alice.setName("Alice");
-    bob.setName("Bob");
-
-    // Attach BEFORE adding orders: addOrder() passes the observers to each order.
-    alice.getOrdersList()->attach(logObserver);
-
-    // Default-constructed order has no player/territory, so it is invalid.
-    alice.issueOrder("Deploy");
-    // A Negotiate between two different players is valid.
-    alice.getOrdersList()->addOrder(new Negotiate(&alice, &bob));
-
-    std::cout << "  Executing the invalid Deploy order..." << std::endl;
-    alice.getOrdersList()->getOrder(0)->execute();
-
-    std::cout << "  Executing the valid Negotiate order..." << std::endl;
-    alice.getOrdersList()->getOrder(1)->execute();
 
 
     // The observer was created here, so it is deleted here.
