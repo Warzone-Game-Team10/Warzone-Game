@@ -44,9 +44,10 @@ void checkCopies(OrdersList& original, OrdersList& copied, const std::string& op
 void testCopiesPreserveChangedDescriptions() {
     OrdersList original;
     addAllOrderTypes(original);
-    Order generic;
+    Territory marker(999, "Copy marker");
+    Deploy sample(nullptr, &marker, 1);
     for (int index = 0; index < 6; ++index) {
-        *original.getOrder(index) = generic;
+        original.getOrder(index)->Order::operator=(sample);
     }
 
     OrdersList copied(original);
@@ -67,7 +68,7 @@ void testOrderListCopies() {
         checkCopies(original, copied, "Copy construction");
 
         OrdersList assigned;
-        assigned.addOrder(new Order());
+        assigned.addOrder(new Deploy());
         assigned = original;
         checkCopies(original, assigned, "Assignment");
         Order* beforeSelfAssignment = assigned.getOrder(0);
@@ -78,8 +79,9 @@ void testOrderListCopies() {
 
         std::ostringstream before, after, changed;
         before << *original.getOrder(0);
-        Order generic;
-        *copied.getOrder(0) = generic;
+        Territory marker(999, "Changed copy");
+        Deploy sample(nullptr, &marker, 1);
+        copied.getOrder(0)->Order::operator=(sample);
         after << *original.getOrder(0);
         changed << *copied.getOrder(0);
         check(before.str() == after.str() && changed.str() != after.str(),
@@ -166,7 +168,7 @@ void testOwnedTargetValidation() {
 
     OrdersList copied(queued);
     OrdersList assigned;
-    assigned.addOrder(new Order());
+    assigned.addOrder(new Deploy());
     assigned = queued;
     // Check each rule on all three lists; exercise execution once per case.
     for (int index = 0; index < 12; ++index) {
@@ -551,9 +553,9 @@ bool testOrders() {
     checkExecution(incompleteAirlift, false, "Default Airlift");
     testTransferValidation();
     std::cout << "PASS: Advance and Airlift validation checks passed.\n";
-    Order generic;
-    checkValidation(!generic.validate(), "Generic order is invalid");
-    checkExecution(generic, false, "Generic order");
+    Deploy incompleteDeploy;
+    checkValidation(!incompleteDeploy.validate(), "Incomplete Deploy is invalid");
+    checkExecution(incompleteDeploy, false, "Incomplete Deploy");
     testOwnedTargetValidation();
     std::cout << "PASS: Deploy and Blockade validation checks passed.\n";
     testCopiesPreserveChangedDescriptions();
@@ -600,7 +602,7 @@ bool testOrders() {
     // 4. Print the entire list state using our overloaded << stream operator
     std::cout << std::endl << mainQueue << std::endl << std::endl;
 
-    // 5. Test the move execution requirement 
+    // 5. Test the move execution requirement
     std::cout << "[Step 3] Shuffling Priority: Moving Slot [4] (Airlift) to Slot [0]..." << std::endl;
     mainQueue.move(4, 0); // Shifts everything down and locks Airlift at the front
     std::cout << mainQueue << std::endl << std::endl;
@@ -624,7 +626,7 @@ bool testOrders() {
     std::cout << "   TEST RUN COMPLETE   " << std::endl;
     std::cout << "==================================================" << std::endl;
 
-    // When main exits, mainQueue's destructor fires automatically sweeping 
+    // When main exits, mainQueue's destructor fires automatically sweeping
     // up all remaining heap data blocks cleanly.
     return true;
 }

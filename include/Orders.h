@@ -31,11 +31,11 @@ public:
     // FRIEND OPERATOR 
     friend std::ostream& operator<<(std::ostream& outs, const Order& order);
 
-    virtual bool validate();       // method which verifies if order is illegal 
+    virtual bool validate()=0;       // method which verifies if order is illegal 
     virtual void execute();        // method which executes the game action 
 
     // Caller owns the copy; subclasses preserve their specific type and state.
-    virtual Order* clone() const;
+    virtual Order* clone() const=0;
 
     // When copying a player, point this order to the new player and territory copies.
     // Copying only the order keeps its links to the original players and territories.

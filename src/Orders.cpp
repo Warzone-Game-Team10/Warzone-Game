@@ -1,4 +1,4 @@
-#include "Orders.h"
+﻿#include "Orders.h"
 #include "Player.h"
 #include <iostream>
 #include <memory>
@@ -7,7 +7,7 @@
 #include <sstream>//used for std::ostringstream text; in stringToLog function
 
 //==========================================================================================
-//                  1. PARENT CLASS ( ORDER ) IMPLEMENTATION 
+//                  1. PARENT CLASS ( ORDER ) IMPLEMENTATION
 //==========================================================================================
 
 
@@ -33,23 +33,24 @@ Order::~Order() {
     delete effect;
 }
 
-// ---------- ASSIGNMENT OPERATOR ---------- 
+// ---------- ASSIGNMENT OPERATOR ----------
 Order& Order::operator=(const Order& other) {
     if (this != &other) {
         // Finish allocating both strings before replacing any existing state.
+        std::unique_ptr<std::string> newDescription(
+            other.description ? new std::string(*other.description) : nullptr);
+        std::unique_ptr<std::string> newEffect(
+            other.effect ? new std::string(*other.effect) : nullptr);
         Subject::operator=(other);
-        Order copy(other);
-        std::swap(description, copy.description);
-        std::swap(effect, copy.effect);
-        std::swap(executed, copy.executed);
+        delete description;
+        delete effect;
+        description = newDescription.release();
+        effect = newEffect.release();
+        executed = other.executed;
     }
     return *this;
 }
 
-// Copy through the public interface without losing the dynamic order type.
-Order* Order::clone() const {
-    return new Order(*this);
-}
 
 Deploy* Deploy::clone() const {
     return new Deploy(*this);
@@ -151,9 +152,9 @@ void OrdersList::rebindContext(const Player* original, Player* destination,
 }
 
 
-// ------------------- VALIDATE +  EXECUTE METHODS  ------------------- 
+// ------------------- VALIDATE +  EXECUTE METHODS  -------------------
 
-//VALIDATE METHOD : 
+//VALIDATE METHOD :
 
 bool Order::validate(){
     // A generic order has no specific action whose requirements can be checked.
@@ -163,7 +164,7 @@ bool Order::validate(){
 
 
 
-//EXECUTE METHOD : 
+//EXECUTE METHOD :
 
 bool Order::validateExecution() {
     executed = false;
@@ -181,15 +182,9 @@ void Order::recordEffect(const std::string& action) {
     std::cout << "Executing demonstration: " << *effect << std::endl;
 }
 
-void Order::execute() {
-    if (validateExecution()) {
-        recordEffect("execution of " + *description);
-    }
-    notify(this);// notify observer
-}
 
 //=============================================================================================
-//                  2.  CHILD CLASSES IMPLEMENTATION 
+//                  2.  CHILD CLASSES IMPLEMENTATION
 //=============================================================================================
 
 
@@ -216,19 +211,19 @@ Deploy::Deploy(const Deploy& other)
     : Order(other), issuer(other.issuer), target(other.target), armyCount(other.armyCount) {}
 
 
-// Destructor 
+// Destructor
 Deploy::~Deploy() {
-    // the second we get to the end of the closing brace " } " of the child destructor, 
+    // the second we get to the end of the closing brace " } " of the child destructor,
     // C++ automatically jumps up and fires the parent destructor Order::~Order() on its own.
 }
 
 
-// Assignment Operator 
+// Assignment Operator
 Deploy& Deploy::operator=(const Deploy& other){
 
-    // 1. run the safety self-assignment check first 
+    // 1. run the safety self-assignment check first
     if(this != &other){
-        // We call the parent's assignment operator to safely wipe out our old 
+        // We call the parent's assignment operator to safely wipe out our old
         // string allocation and deep-copy other's string allocation.
         Order::operator=(other);
         issuer = other.issuer;
@@ -236,7 +231,7 @@ Deploy& Deploy::operator=(const Deploy& other){
         armyCount = other.armyCount;
     }
     return *this;
-} 
+}
 
 
 // Validate
@@ -246,12 +241,12 @@ bool Deploy::validate() {
 }
 
 
-// Execute 
+// Execute
 void Deploy::execute() {
     if (validateExecution()) {
         recordEffect("deployment of " + std::to_string(armyCount) + " armies to " + target->getName());
     }
-    
+
     notify(this);// notify observer
 
 }
@@ -262,7 +257,7 @@ void Deploy::execute() {
 
 
 
-// --------------- ADVANCE ORDER --------------- 
+// --------------- ADVANCE ORDER ---------------
 
 // Default constructor: incomplete orders remain queueable.
 Advance::Advance() : Advance(nullptr, nullptr, nullptr, 0) {}
@@ -331,7 +326,7 @@ void Advance::execute() {
 
 
 
-// --------------- BOMB ORDER --------------- 
+// --------------- BOMB ORDER ---------------
 
 // Default constructor: orders remain queueable, but lack the context needed for validation.
 Bomb::Bomb() : Bomb(nullptr, nullptr) {}
@@ -405,7 +400,7 @@ void Bomb::execute() {
 
 
 
-// --------------- BLOCKADE ORDER --------------- 
+// --------------- BLOCKADE ORDER ---------------
 
 // Default constructor
 // Keep existing callers working; an order without context can be queued but is invalid.
@@ -430,7 +425,7 @@ Blockade::Blockade(const Blockade& other)
 
 // destructor
 Blockade::~Blockade() {
-    
+
 }
 
 
@@ -460,7 +455,7 @@ void Blockade::execute() {
     if (validateExecution()) {
         recordEffect("blockade of " + target->getName());
     }
-    
+
     notify(this);// notify observer
 
 }
@@ -469,7 +464,7 @@ void Blockade::execute() {
 
 
 
-// ---------------  AIRLIFT ORDER --------------- 
+// ---------------  AIRLIFT ORDER ---------------
 
 // Default constructor: orders remain queueable, but lack the context needed for validation.
 Airlift::Airlift() : Airlift(nullptr, nullptr, nullptr, 0) {}
@@ -521,7 +516,7 @@ void Airlift::execute() {
     if (validateExecution()) {
         recordEffect("airlift of " + std::to_string(armyCount) + " armies from " + source->getName() + " to " + target->getName());
     }
-    
+
     notify(this);// notify observer
 
 }
@@ -532,7 +527,7 @@ void Airlift::execute() {
 
 
 
-// --------------- NEGOTIATE ORDER --------------- 
+// --------------- NEGOTIATE ORDER ---------------
 
 
 // Default constructor: orders remain queueable, but lack the context needed for validation.
@@ -577,7 +572,7 @@ void Negotiate::execute() {
     if (validateExecution()) {
         recordEffect("negotiation between " + issuer->getName() + " and " + partner->getName());
     }
-    
+
     notify(this);// notify observer
 
 }
@@ -596,7 +591,7 @@ void Negotiate::execute() {
 // =============================================================================================
 
 
-// default constructor 
+// default constructor
 OrdersList::OrdersList(){
 
 }
@@ -627,14 +622,14 @@ OrdersList::~OrdersList() {
     for (size_t i = 0; i < list.size(); ++i) {
         if (list[i] != nullptr) {
             delete list[i];      // Blows up the object on the heap
-            list[i] = nullptr;   // this is to avoid dangling pointers... 
+            list[i] = nullptr;   // this is to avoid dangling pointers...
         }
     }
     list.clear(); // Empties out the pointer boxes inside the vector array ( makes ur array size = 0 )
 }
 
 
-// assignment operator 
+// assignment operator
 OrdersList& OrdersList::operator=(const OrdersList& other) {
     if (this != &other) {
         Subject::operator=(other);
@@ -647,7 +642,7 @@ OrdersList& OrdersList::operator=(const OrdersList& other) {
 
 
 
-// ADDING AN ORDER  
+// ADDING AN ORDER
 void OrdersList::addOrder(Order* newOrder) {
     if (newOrder != nullptr) {
         list.push_back(newOrder); // this puts the order pointer onto the back of the queue
@@ -730,7 +725,7 @@ std::ostream& operator<<(std::ostream& outs, const Order& order){
 // Overloading << for the OrdersList manager container class
 std::ostream& operator<<(std::ostream& outs, const OrdersList& list) {
     outs << "=== Player Orders List ===\n";
-    
+
     // Safety check: if our list vector is empty, tell the console
     if (list.list.empty()) {
         outs << "(No active orders in queue)\n";
@@ -774,20 +769,26 @@ std::string Order::stringToLog() const {
 
 /*. ==================== ADDITIONAL NOTES ===========================
 
-    The Stack: A temporary, fast memory zone where standard variables are stored. 
+    The Stack: A temporary, fast memory zone where standard variables are stored.
     Objects created here are deleted automatically by the computer when a function ends.
 
 
-    The Heap: A massive pool of permanent system memory. Objects created here using the 
+    The Heap: A massive pool of permanent system memory. Objects created here using the
     keyword new stay in your RAM forever until you manually delete them.
 
 
-    Memory Leak: This happens when you lose or delete a pointer variable on the Stack, 
+    Memory Leak: This happens when you lose or delete a pointer variable on the Stack,
     but leave the allocated data sitting on the Heap. The data becomes trapped in your RAM chips forever.
 
 
-    Dangling Pointer: A pointer variable that still holds an address number, but the data at 
+    Dangling Pointer: A pointer variable that still holds an address number, but the data at
     that address has already been deleted by another part of the program.
 
 
 */
+
+void Order::execute() {
+    // Base definition for the abstract Order class.
+    // Derived classes implement their own execution behavior.
+}
+

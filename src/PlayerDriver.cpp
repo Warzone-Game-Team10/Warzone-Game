@@ -265,7 +265,7 @@ void testPlayerCopiesSurviveSource(bool assignment, bool ownedReferences) {
         orders->addOrder(new Negotiate(&carol, &alice));
         orders->addOrder(new Negotiate(&alice, &alice));
         orders->addOrder(new Deploy());
-        orders->addOrder(new Order());
+        orders->addOrder(new Bomb());
         for (int index = 0; index < 6; ++index) {
             executeForPlayerCopy(orders->getOrder(index));
         }
@@ -343,12 +343,20 @@ void testPlayerCopiesSurviveSource(bool assignment, bool ownedReferences) {
 // Make copying fail on purpose, then check that Bob still has his old data.
 class UncopyableOrder : public Order {
 public:
-    Order* clone() const override;
-};
+    UncopyableOrder() : Order() {}
 
-Order* UncopyableOrder::clone() const {
-    throw runtime_error("Deliberate order-copy failure");
-}
+    bool validate() override {
+        return false;
+    }
+
+    void execute() override {
+        // Intentionally does nothing.
+    }
+
+    Order* clone() const override {
+        throw std::runtime_error("Deliberate order-copy failure");
+    }
+};
 
 void testPlayerAssignmentFailurePreservesDestination() {
     Player alice;
