@@ -343,8 +343,8 @@ void testPlayerCopiesSurviveSource(bool assignment, bool ownedReferences) {
                     scenario + " keeps opponent shared");
     territories[0]->setArmyCount(0);
     executeForPlayerCopy(bob->getOrdersList()->getOrder(1));
-    checkPlayerCopy(orderText(bob->getOrdersList()->getOrder(1)).find("Effect:") == string::npos,
-                    scenario + " revalidates copied context and clears old effects");
+    checkPlayerCopy(orderText(bob->getOrdersList()->getOrder(1)).find("Effect: Invalid order:") != string::npos,
+                    scenario + " revalidates copied context and stores invalid-order effect");
     checkPlayerCopy(territories[1]->getArmyCount() == 6 && territories[1]->getOwner() == bob.get(),
                     scenario + " preserves destination ownership");
     Player& self = *bob;

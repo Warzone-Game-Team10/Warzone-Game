@@ -183,10 +183,13 @@ bool Order::validate(){
 bool Order::validateExecution() {
     executed = false;
     effect->clear();
+
     if (!validate()) {
-        std::cout << "Order execution failed: invalid order (" << *description << ")." << std::endl;
+        *effect = "Invalid order: " + *description;
+        std::cout << "Order execution failed: " << *effect << std::endl;
         return false;
     }
+
     return true;
 }
 
@@ -793,8 +796,8 @@ void OrdersList::move(int oldIndex, int newIndex) {
 std::ostream& operator<<(std::ostream& outs, const Order& order){
     // We dereference the internal description pointer to print the raw text words
     outs << "Order Description: " << *(order.description);
-    if (order.executed) {
-        outs << " Effect: " << *order.effect;
+    if (order.effect != nullptr && !order.effect->empty()) {
+    outs << " Effect: " << *order.effect;
     }
     return outs;
 }

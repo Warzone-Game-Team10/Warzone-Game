@@ -1,4 +1,4 @@
-﻿#include "Orders.h"
+#include "Orders.h"
 #include "OrdersDriver.h"
 #include "Player.h"
 #include <iostream>
@@ -128,7 +128,14 @@ void checkExecution(Order& order, bool valid, const std::string& label) {
     checkValidation((output.find("Executing") != std::string::npos) == valid,
           label + " executes only when valid");
     if (!valid) {
-        checkValidation(output.find("invalid") != std::string::npos, label + " reports rejection");
+        checkValidation(output.find("Invalid order:") != std::string::npos, label + " reports rejection");
+
+        std::ostringstream orderText;
+        orderText << order;
+        checkValidation(
+            orderText.str().find("Effect: Invalid order:") != std::string::npos,
+            label + " stores rejection as its effect"
+        );
     }
 }
 
