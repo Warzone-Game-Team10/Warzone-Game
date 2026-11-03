@@ -20,6 +20,7 @@ private:
 
     // NEW: Available armies for deployment
     int reinforcementPool = 0;
+    bool conqueredThisTurn = false;
 
     // Build the copies for the player that will keep them.
     Player(const Player& original, Player* destination);
@@ -53,6 +54,11 @@ public:
 
     // Check if player owns this territory
     bool ownsTerritory(Territory* territory);
+    // Move ownership of the existing territory object (without invalidating pointers).
+    bool transferTerritoryTo(Player& recipient, int territoryId);
+    bool hasConqueredThisTurn() const;
+    void resetConqueredThisTurn();
+    void flagConquest();
 
     //==========ASSIGNMENT FUNCTION==================
 

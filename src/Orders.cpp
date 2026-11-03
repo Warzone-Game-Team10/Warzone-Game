@@ -4,6 +4,8 @@
 #include <memory>
 #include <string>
 #include <utility>
+#include <algorithm>
+#include <random>
 #include <sstream>//used for std::ostringstream text; in stringToLog function
 
 //==========================================================================================
@@ -322,16 +324,12 @@ Advance& Advance::operator=(const Advance& other) {
 
 // Validation Method
 bool Advance::validate() {
-    if (issuer == nullptr || source == nullptr || target == nullptr ||
-        !issuer->ownsTerritory(source) || source->getId() == target->getId() ||
-        armyCount <= 0 || armyCount > source->getArmyCount()) {
-        return false;
-    }
-    // Player clones territories, so compare IDs
-    for (Territory* neighbor : source->getAdjacentTerritories()) {
-        if (neighbor != nullptr && neighbor->getId() == target->getId()) {
-            return true;
-        }
+    if (!issuer || !source || !target || armyCount <= 0 ||
+        source->getId() == target->getId()) return false;
+    Territory* actualSource = findOwnedTerritory(issuer, source);
+    if (!actualSource || armyCount > actualSource->getArmyCount()) return false;
+    for (Territory* adjacent : actualSource->getAdjacentTerritories()) {
+        if (adjacent && adjacent->getId() == target->getId()) return true;
     }
     return false;
 }
@@ -340,15 +338,51 @@ bool Advance::validate() {
 // Execution Method
 void Advance::execute() {
     if (validateExecution()) {
-        recordEffect("advance of " + std::to_string(armyCount) + " armies from " + source->getName() + " to " + target->getName());
+        Territory* from = findOwnedTerritory(issuer, source);
+        Territory* friendly = findOwnedTerritory(issuer, target);
+        from->setArmyCount(from->getArmyCount() - armyCount);
+        if (friendly) {
+            friendly->setArmyCount(friendly->getArmyCount() + armyCount);
+            recordRealEffect("Advanced " + std::to_string(armyCount) + " armies from " +
+                             from->getName() + " to " + friendly->getName() + ".");
+        } else {
+            // An enemy's owned copy is authoritative when available.
+            Player* defender = target->getOwner();
+            Territory* destination = defender ? findOwnedTerritory(defender, target) : nullptr;
+            if (!destination) destination = target; // neutral territory
+            const int initialDefenders = destination->getArmyCount();
+            int attackers = armyCount, defenders = initialDefenders;
+            // Independent hits, with simultaneous casualties each round.
+            static std::mt19937 generator(std::random_device{}());
+            std::bernoulli_distribution attackerHit(0.60), defenderHit(0.70);
+            while (attackers > 0 && defenders > 0) {
+                int defenderLosses = 0, attackerLosses = 0;
+                for (int i = 0; i < attackers; ++i) if (attackerHit(generator)) ++defenderLosses;
+                for (int i = 0; i < defenders; ++i) if (defenderHit(generator)) ++attackerLosses;
+                defenders = std::max(0, defenders - defenderLosses);
+                attackers = std::max(0, attackers - attackerLosses);
+            }
+            if (defenders == 0 && attackers > 0) {
+                destination->setArmyCount(attackers);
+                if (defender && defender != issuer && defender->ownsTerritory(destination)) {
+                    defender->transferTerritoryTo(*issuer, destination->getId());
+                } else if (!issuer->ownsTerritory(destination)) {
+                    issuer->addTerritory(destination);
+                    // The map/neutral original is not the owned copy.
+                    destination = findOwnedTerritory(issuer, destination);
+                }
+                issuer->flagConquest();
+                recordRealEffect("Conquered " + destination->getName() + " with " +
+                                 std::to_string(attackers) + " surviving armies.");
+            } else {
+                destination->setArmyCount(defenders);
+                recordRealEffect("Attack on " + destination->getName() + " failed; " +
+                                 std::to_string(defenders) + " defending armies remain.");
+            }
+        }
     }
-    notify(this);// notify observer
-
+    notify(this);
 }
-
-
-
-
 
 
 
@@ -531,25 +565,24 @@ Airlift& Airlift::operator=(const Airlift& other) {
 
 // Validation Method
 bool Airlift::validate() {
-    return issuer != nullptr && source != nullptr && target != nullptr &&
-           issuer->ownsTerritory(source) && source->getId() != target->getId() &&
-           armyCount > 0 && armyCount <= source->getArmyCount();
+    if (!issuer || !source || !target || armyCount <= 0 ||
+        source->getId() == target->getId()) return false;
+    Territory* from = findOwnedTerritory(issuer, source);
+    Territory* to = findOwnedTerritory(issuer, target);
+    return from && to && armyCount <= from->getArmyCount();
 }
 
-
-// Execution Method
 void Airlift::execute() {
     if (validateExecution()) {
-        recordEffect("airlift of " + std::to_string(armyCount) + " armies from " + source->getName() + " to " + target->getName());
+        Territory* from = findOwnedTerritory(issuer, source);
+        Territory* to = findOwnedTerritory(issuer, target);
+        from->setArmyCount(from->getArmyCount() - armyCount);
+        to->setArmyCount(to->getArmyCount() + armyCount);
+        recordRealEffect("Airlifted " + std::to_string(armyCount) + " armies from " +
+                         from->getName() + " to " + to->getName() + ".");
     }
-
-    notify(this);// notify observer
-
+    notify(this);
 }
-
-
-
-
 
 
 

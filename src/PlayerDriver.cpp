@@ -268,7 +268,8 @@ void testPlayerCopiesSurviveSource(bool assignment, bool ownedReferences) {
         orders->addOrder(new Deploy());
         orders->addOrder(new Bomb());
         for (int index = 0; index < 6; ++index) {
-            executeForPlayerCopy(orders->getOrder(index));
+            if (index == 0 || index == 2 || index == 3 || index == 5)
+                executeForPlayerCopy(orders->getOrder(index));
         }
         for (int index = 0; index < 11; ++index) {
             storedText.push_back(orderText(orders->getOrder(index)));
@@ -316,7 +317,9 @@ void testPlayerCopiesSurviveSource(bool assignment, bool ownedReferences) {
                             bob->getReinforcementPool() == 14,
                             scenario + " deploy updates copied territory and reinforcement pool");
         }
-        const string expectedEffect = index == 0 ? "Effect: Deployed" : "Effect: Simulated";
+        const string expectedEffect = index == 0 ? "Effect: Deployed" :
+                                      (index == 1 ? "Effect: Advanced" :
+                                      (index == 4 ? "Effect: Airlifted" : "Effect: Simulated"));
         checkPlayerCopy(orderText(order).find(expectedEffect) != string::npos,
                         scenario + " executes copied order " + to_string(index));
     }
@@ -339,8 +342,8 @@ void testPlayerCopiesSurviveSource(bool assignment, bool ownedReferences) {
     executeForPlayerCopy(bob->getOrdersList()->getOrder(1));
     checkPlayerCopy(orderText(bob->getOrdersList()->getOrder(1)).find("Effect:") == string::npos,
                     scenario + " revalidates copied context and clears old effects");
-    checkPlayerCopy(territories[1]->getArmyCount() == 0 && territories[1]->getOwner() == bob.get(),
-                    scenario + " execution remains simulated");
+    checkPlayerCopy(territories[1]->getArmyCount() == 6 && territories[1]->getOwner() == bob.get(),
+                    scenario + " preserves destination ownership");
     Player& self = *bob;
     *bob = self;
     checkPlayerCopy(bob->getTerritoryList()[0] == territories[0], scenario + " supports self-assignment");

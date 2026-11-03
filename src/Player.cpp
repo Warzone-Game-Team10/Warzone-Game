@@ -52,7 +52,7 @@ Player::Player(const Player& original) : Player(original, this) {}
 // Assignment can prepare the copies before giving them to the destination player.
 Player::Player(const Player& original, Player* destination)
     : name(original.name), territoryList(), cardHand(nullptr), ordersList(nullptr),
-      reinforcementPool(original.reinforcementPool) {
+      reinforcementPool(original.reinforcementPool), conqueredThisTurn(original.conqueredThisTurn) {
     // These temporary copies clean themselves up if any step fails.
     // Store them here only after the whole copy is ready.
     auto handCopy = std::make_unique<Hand>(*original.cardHand);
@@ -102,6 +102,7 @@ Player& Player::operator=(const Player& other) {
         std::swap(cardHand, replacement.cardHand);
         std::swap(ordersList, replacement.ordersList);
         std::swap(reinforcementPool, replacement.reinforcementPool);
+        std::swap(conqueredThisTurn, replacement.conqueredThisTurn);
         // The temporary player now holds the old data and deletes it when this function ends.
     }
     return *this;
@@ -139,6 +140,27 @@ void Player::addTerritory(Territory* territory) {
     copy->setOwner(this);
     territoryList.push_back(copy);//add the deep copy to the player's list
 }
+
+bool Player::transferTerritoryTo(Player& recipient, int territoryId) {
+    if (&recipient == this) return false;
+    for (auto it = territoryList.begin(); it != territoryList.end(); ++it) {
+        Territory* territory = *it;
+        if (territory && territory->getId() == territoryId) {
+            if (recipient.ownsTerritory(territory)) return false;
+            // Reserve before modifying either player; retain the original pointer.
+            recipient.territoryList.reserve(recipient.territoryList.size() + 1);
+            recipient.territoryList.push_back(territory);
+            territoryList.erase(it);
+            territory->setOwner(&recipient);
+            return true;
+        }
+    }
+    return false;
+}
+
+bool Player::hasConqueredThisTurn() const { return conqueredThisTurn; }
+void Player::resetConqueredThisTurn() { conqueredThisTurn = false; }
+void Player::flagConquest() { conqueredThisTurn = true; }
 
 //check if player own this territory
 bool Player::ownsTerritory(Territory* territory) {

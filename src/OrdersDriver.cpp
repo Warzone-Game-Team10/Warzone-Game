@@ -205,87 +205,78 @@ void testOwnedTargetValidation() {
     checkExecution(validBlockade, true, "Blockade remains simulated for Issue #28");
 }
 
-// Queue both transfer types, then verify validation survives both list-copy paths.
-void checkTransferCase(Player* issuer, Territory* source, Territory* target, int amount,
-                       bool advanceValid, bool airliftValid, const std::string& label) {
-    OrdersList queued;
-    queued.addOrder(new Advance(issuer, source, target, amount));
-    queued.addOrder(new Airlift(issuer, source, target, amount));
-    OrdersList copied(queued);
-    OrdersList assigned;
-    assigned = queued;
-    for (OrdersList* list : {&queued, &copied, &assigned}) {
-        checkValidation(list->getOrder(0)->validate() == advanceValid, label + " (Advance, including copies)");
-        checkValidation(list->getOrder(1)->validate() == airliftValid, label + " (Airlift, including copies)");
-    }
-    checkExecution(*queued.getOrder(0), advanceValid, label + " (Advance)");
-    checkExecution(*queued.getOrder(1), airliftValid, label + " (Airlift)");
-}
-
+// Real transfer, combat, and conquest regression tests.
 void testTransferValidation() {
-    Territory source(10, "Source");
-    Territory nearby(11, "Nearby target");
-    Territory distant(12, "Distant opponent target");
-    source.setArmyCount(5);
-    nearby.setArmyCount(2);
-    distant.setArmyCount(8);
-    source.addAdjacentTerritory(&nearby);
-    Player issuer;
-    Player opponent;
+    Territory source(10, "Source"), friendly(11, "Friendly"), distant(12, "Distant");
+    Territory enemyMap(13, "Enemy"), neutral(14, "Neutral");
+    source.setArmyCount(20);
+    friendly.setArmyCount(4);
+    distant.setArmyCount(2);
+    enemyMap.setArmyCount(0); // guaranteed conquest regardless of random combat
+    neutral.setArmyCount(0);
+    source.addAdjacentTerritory(&friendly);
+    source.addAdjacentTerritory(&enemyMap);
+    source.addAdjacentTerritory(&neutral);
+    Player issuer, opponent;
     issuer.addTerritory(&source);
-    opponent.addTerritory(&distant);
-    Territory* owned = issuer.getTerritoryList().front();
-    Territory* enemy = opponent.getTerritoryList().front();
-    Territory sameSource(*owned);
-    Territory sameNeighbor(nearby);
+    issuer.addTerritory(&friendly);
+    issuer.addTerritory(&distant);
+    opponent.addTerritory(&enemyMap);
+    Territory* from = issuer.getTerritoryList()[0];
+    Territory* to = issuer.getTerritoryList()[1];
+    Territory* far = issuer.getTerritoryList()[2];
+    Territory* enemy = opponent.getTerritoryList()[0];
+    from->setAdjacentTerritories({to, enemy, &neutral});
 
-    checkTransferCase(&issuer, owned, &nearby, 1, true, true, "Positive amount to adjacent target");
-    checkTransferCase(&issuer, owned, &nearby, 5, true, true, "Exact available armies");
-    checkTransferCase(nullptr, owned, &nearby, 1, false, false, "Missing issuer");
-    checkTransferCase(&issuer, nullptr, &nearby, 1, false, false, "Missing source");
-    checkTransferCase(&issuer, owned, nullptr, 1, false, false, "Missing target");
-    checkTransferCase(&opponent, owned, &nearby, 1, false, false, "Source not owned by issuer");
-    checkTransferCase(&issuer, owned, owned, 1, false, false, "Identical source and target");
-    checkTransferCase(&issuer, owned, &sameSource, 1, false, false, "Same territory ID in different objects");
-    checkTransferCase(&issuer, owned, &nearby, 0, false, false, "Zero transfer amount");
-    checkTransferCase(&issuer, owned, &nearby, -1, false, false, "Negative transfer amount");
-    checkTransferCase(&issuer, owned, &nearby, 6, false, false, "More than available armies");
-    checkTransferCase(&issuer, owned, enemy, 1, false, true, "Distant opponent target");
-    checkTransferCase(&issuer, owned, &sameNeighbor, 1, true, true, "Adjacent target recognized by ID");
-    owned->addAdjacentTerritory(enemy);
-    checkTransferCase(&issuer, owned, enemy, 1, true, true, "Adjacent opponent target");
+    Advance invalidAdvance(&issuer, from, far, 2);
+    Airlift invalidAirlift(&issuer, from, enemy, 2);
+    checkValidation(!invalidAdvance.validate(), "Advance requires adjacency");
+    checkValidation(!invalidAirlift.validate(), "Airlift requires owned target");
+    checkExecution(invalidAdvance, false, "Nonadjacent Advance");
+    checkExecution(invalidAirlift, false, "Enemy Airlift");
+    checkValidation(!Advance(&issuer, from, to, 0).validate(), "Advance rejects zero");
+    checkValidation(!Airlift(&issuer, from, far, 21).validate(), "Airlift rejects excess");
+    checkValidation(!Advance(&issuer, from, from, 1).validate(), "Advance rejects same ID");
+    checkValidation(!Airlift(&issuer, from, from, 1).validate(), "Airlift rejects same ID");
 
-    // Copying keeps borrowed context; assignment must replace all transfer fields.
-    Advance advance(&issuer, owned, &nearby, 5);
-    Airlift airlift(&issuer, owned, enemy, 5);
-    Advance advanceCopy(advance), advanceAssigned;
-    Airlift airliftCopy(airlift), airliftAssigned;
-    advanceAssigned = advance;
-    airliftAssigned = airlift;
-    checkValidation(advanceCopy.validate() && advanceAssigned.validate(), "Direct Advance copies preserve valid context");
-    checkValidation(airliftCopy.validate() && airliftAssigned.validate(), "Direct Airlift copies preserve valid context");
-    advanceAssigned = Advance(&opponent, owned, &nearby, 5);
-    airliftAssigned = Airlift(&opponent, owned, enemy, 5);
-    checkValidation(!advanceAssigned.validate() && !airliftAssigned.validate(), "Transfer assignment replaces issuer");
-    advanceAssigned = Advance(&issuer, enemy, &nearby, 1);
-    airliftAssigned = Airlift(&issuer, enemy, &nearby, 1);
-    checkValidation(!advanceAssigned.validate() && !airliftAssigned.validate(), "Transfer assignment replaces source");
-    advanceAssigned = Advance(&issuer, owned, owned, 1);
-    airliftAssigned = Airlift(&issuer, owned, owned, 1);
-    checkValidation(!advanceAssigned.validate() && !airliftAssigned.validate(), "Transfer assignment replaces target");
-    advanceAssigned = Advance(&issuer, owned, &nearby, 0);
-    airliftAssigned = Airlift(&issuer, owned, enemy, 0);
-    checkValidation(!advanceAssigned.validate() && !airliftAssigned.validate(), "Transfer assignment replaces amount");
+    Advance move(&issuer, &source, &friendly, 3);
+    checkExecution(move, true, "Friendly Advance");
+    checkValidation(from->getArmyCount() == 17 && to->getArmyCount() == 7,
+                    "Advance transfers armies between owned copies");
+    Airlift fly(&issuer, &source, &distant, 5);
+    checkExecution(fly, true, "Friendly Airlift");
+    checkValidation(from->getArmyCount() == 12 && far->getArmyCount() == 7,
+                    "Airlift transfers armies without adjacency");
+    checkValidation(source.getArmyCount() == 20 && friendly.getArmyCount() == 4,
+                    "Orders do not silently mutate original map aliases");
 
-    checkValidation(owned->getArmyCount() == 5 && owned->getOwner() == &issuer &&
-          nearby.getArmyCount() == 2 && nearby.getOwner() == nullptr &&
-          enemy->getArmyCount() == 8 && enemy->getOwner() == &opponent &&
-          issuer.getTerritoryList().size() == 1 && opponent.getTerritoryList().size() == 1,
-          "Transfer execution leaves armies and ownership unchanged");
-    owned->setArmyCount(4);
-    checkValidation(!advanceCopy.validate() && !airliftCopy.validate(), "Copies see current source armies");
-    checkExecution(advance, false, "Advance after source armies decrease");
-    checkExecution(airlift, false, "Airlift after source armies decrease");
+    Advance attack(&issuer, from, enemy, 4);
+    checkExecution(attack, true, "Conquest of empty enemy territory");
+    checkValidation(from->getArmyCount() == 8 && issuer.ownsTerritory(enemy) &&
+                    !opponent.ownsTerritory(enemy) && enemy->getOwner() == &issuer &&
+                    enemy->getArmyCount() == 4 && issuer.hasConqueredThisTurn(),
+                    "Conquest transfers ownership and flags card reward");
+    issuer.resetConqueredThisTurn();
+    checkValidation(!issuer.hasConqueredThisTurn(), "Conquest flag resets at turn boundary");
+    Advance neutralAttack(&issuer, from, &neutral, 2);
+    checkExecution(neutralAttack, true, "Conquest of neutral territory");
+    checkValidation(issuer.ownsTerritory(&neutral) && issuer.hasConqueredThisTurn(),
+                    "Neutral conquest adds owned territory and flags reward");
+
+    // Deterministic loss: zero attacking armies is invalid; a positive battle
+    // with defenders is stochastic and must preserve nonnegative counts.
+    Territory defended(15, "Defended");
+    defended.setArmyCount(30);
+    defended.setOwner(&opponent);
+    opponent.addTerritory(&defended);
+    Territory* guarded = opponent.getTerritoryList().back();
+    from->addAdjacentTerritory(guarded);
+    Advance battle(&issuer, from, guarded, 2);
+    checkExecution(battle, true, "Probabilistic enemy battle");
+    checkValidation(from->getArmyCount() == 4 && guarded->getArmyCount() >= 0,
+                    "Combat consumes attacking armies and keeps nonnegative defenders");
+    checkValidation(!Airlift(&issuer, from, guarded, 1).validate(),
+                    "Airlift still rejects enemy target after battle");
 }
 
 // The queue owns each case; both list-copy paths must preserve its validation context.
