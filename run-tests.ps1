@@ -41,3 +41,5 @@ if ($failed.Count -gt 0) {
 }
 
 Write-Host "`nALL SELECTED WARZONE TESTS PASSED!" -ForegroundColor Green
+
+
