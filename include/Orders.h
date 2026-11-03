@@ -136,6 +136,8 @@ public:
     bool validate() override;
     void execute() override;
 
+    Player* getIssuer() const { return issuer; }
+
 private:
     // Borrowed links: these objects must outlive the order and all its copies.
     Player* issuer;
@@ -162,6 +164,8 @@ public:
 
     bool validate() override;
     void execute() override;
+    Player* getIssuer() const { return issuer; }
+
 private:
     // Borrowed links: these objects must outlive the order and all its copies.
     Player* issuer;
@@ -187,6 +191,8 @@ public:
 
     bool validate() override;
     void execute() override;
+    Player* getIssuer() const { return issuer; }
+
 private:
     // Borrowed links: these objects must outlive the order and all its copies.
     Player* issuer;
@@ -214,6 +220,8 @@ public:
 
     bool validate() override;
     void execute() override;
+    Player* getIssuer() const { return issuer; }
+
 private:
     // Borrowed links: these players must outlive the order and all its copies.
     Player* issuer;
