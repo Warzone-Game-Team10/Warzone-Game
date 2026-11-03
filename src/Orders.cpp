@@ -89,6 +89,18 @@ Territory* copiedTerritory(Territory* territory,
 }
 }
 
+// Resolve the actual territory owned by a player, even when an order
+// was constructed with an original map territory or another alias.
+Territory* findOwnedTerritory(Player* player, Territory* candidate) {
+    if (player == nullptr || candidate == nullptr) return nullptr;
+    for (Territory* owned : player->getTerritoryList()) {
+        if (owned != nullptr && owned->getId() == candidate->getId()) {
+            return owned;
+        }
+    }
+    return nullptr;
+}
+
 void Order::rebindContext(const Player*, Player*,
                           const std::unordered_map<int, Territory*>&) {}
 
@@ -183,6 +195,12 @@ void Order::recordEffect(const std::string& action) {
 }
 
 
+void Order::recordRealEffect(const std::string& action) {
+    *effect = action;
+    executed = true;
+    std::cout << "Executing: " << *effect << std::endl;
+}
+
 //=============================================================================================
 //                  2.  CHILD CLASSES IMPLEMENTATION
 //=============================================================================================
@@ -236,19 +254,27 @@ Deploy& Deploy::operator=(const Deploy& other){
 
 // Validate
 bool Deploy::validate() {
-    // Use Player's collection-based ownership rules.
-    return issuer != nullptr && target != nullptr && armyCount > 0 && issuer->ownsTerritory(target);
+    return issuer != nullptr && target != nullptr && armyCount > 0 &&
+           findOwnedTerritory(issuer, target) != nullptr &&
+           issuer->getReinforcementPool() >= armyCount;
 }
 
 
 // Execute
 void Deploy::execute() {
     if (validateExecution()) {
-        recordEffect("deployment of " + std::to_string(armyCount) + " armies to " + target->getName());
+        Territory* ownedTarget = findOwnedTerritory(issuer, target);
+        // Re-check before changing state; invalid orders leave state untouched.
+        if (ownedTarget != nullptr && issuer->useReinforcements(armyCount)) {
+            ownedTarget->setArmyCount(ownedTarget->getArmyCount() + armyCount);
+            // Keep the order's effect independent of later state changes.
+            // recordEffect's legacy wording says 'Simulated', so set the
+            // real execution message through the new recordRealEffect helper.
+            recordRealEffect("Deployed " + std::to_string(armyCount) +
+                             " armies to " + ownedTarget->getName() + ".");
+        }
     }
-
-    notify(this);// notify observer
-
+    notify(this); // notify observer
 }
 
 

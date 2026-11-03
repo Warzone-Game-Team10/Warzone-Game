@@ -232,6 +232,7 @@ void testPlayerCopiesSurviveSource(bool assignment, bool ownedReferences) {
     {
         Player alice;
         alice.setName("Alice");
+        alice.setReinforcementPool(20);
         Territory ontario(1, "Ontario", &continent);
         Territory quebec(2, "Quebec", &continent);
         ontario.setArmyCount(10);
@@ -261,7 +262,7 @@ void testPlayerCopiesSurviveSource(bool assignment, bool ownedReferences) {
         orders->addOrder(new Negotiate(&alice, &carol));
         // Check that orders use Bob's territory copies and replace links to Alice.
         // Also check that orders with missing information stay invalid.
-        orders->addOrder(new Airlift(&alice, &ontario, &quebec, 6));
+        orders->addOrder(new Airlift(&alice, &ontario, &quebec, 11));
         orders->addOrder(new Negotiate(&carol, &alice));
         orders->addOrder(new Negotiate(&alice, &alice));
         orders->addOrder(new Deploy());
@@ -288,7 +289,7 @@ void testPlayerCopiesSurviveSource(bool assignment, bool ownedReferences) {
             checkPlayerCopy(orderText(copied) == storedText[index], scenario + " preserves stored output");
         }
         checkPlayerCopy(!bob->getOrdersList()->getOrder(6)->validate(),
-                        scenario + " uses owned Ontario's four armies instead of the map's ten");
+                        scenario + " rejects a transfer larger than owned Ontario's available armies");
         checkPlayerCopy(bob->getTerritoryList()[0] != alice.getTerritoryList()[0],
                         scenario + " creates separate territories");
         // Changing Alice's Ontario must not change Bob's Ontario.
@@ -310,7 +311,13 @@ void testPlayerCopiesSurviveSource(bool assignment, bool ownedReferences) {
         Order* order = bob->getOrdersList()->getOrder(index);
         checkPlayerCopy(order->validate(), scenario + " survives Alice for order " + to_string(index));
         executeForPlayerCopy(order);
-        checkPlayerCopy(orderText(order).find("Effect: Simulated") != string::npos,
+        if (index == 0) {
+            checkPlayerCopy(territories[0]->getArmyCount() == 10 &&
+                            bob->getReinforcementPool() == 14,
+                            scenario + " deploy updates copied territory and reinforcement pool");
+        }
+        const string expectedEffect = index == 0 ? "Effect: Deployed" : "Effect: Simulated";
+        checkPlayerCopy(orderText(order).find(expectedEffect) != string::npos,
                         scenario + " executes copied order " + to_string(index));
     }
     Order* partnerOrder = bob->getOrdersList()->getOrder(7);
@@ -363,6 +370,7 @@ void testPlayerAssignmentFailurePreservesDestination() {
     alice.getOrdersList()->addOrder(new UncopyableOrder());
     Player bob;
     bob.setName("Bob");
+    bob.setReinforcementPool(1);
     Territory ontario(1, "Ontario");
     bob.addTerritory(&ontario);
     bob.getOrdersList()->addOrder(new Deploy(&bob, bob.getTerritoryList()[0], 1));

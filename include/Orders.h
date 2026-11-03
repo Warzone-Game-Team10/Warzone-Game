@@ -52,6 +52,7 @@ protected:
     // Every attempt discards the old result and checks the current game context.
     bool validateExecution();
     void recordEffect(const std::string& action);
+    void recordRealEffect(const std::string& action);
 
 private:
     std::string* effect;
