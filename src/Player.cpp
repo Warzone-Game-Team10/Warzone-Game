@@ -51,7 +51,8 @@ Player::Player(const Player& original) : Player(original, this) {}
 
 // Assignment can prepare the copies before giving them to the destination player.
 Player::Player(const Player& original, Player* destination)
-    : name(original.name), territoryList(), cardHand(nullptr), ordersList(nullptr) {
+    : name(original.name), territoryList(), cardHand(nullptr), ordersList(nullptr),
+      reinforcementPool(original.reinforcementPool) {
     // These temporary copies clean themselves up if any step fails.
     // Store them here only after the whole copy is ready.
     auto handCopy = std::make_unique<Hand>(*original.cardHand);
@@ -100,6 +101,7 @@ Player& Player::operator=(const Player& other) {
         territoryList.swap(replacement.territoryList);
         std::swap(cardHand, replacement.cardHand);
         std::swap(ordersList, replacement.ordersList);
+        std::swap(reinforcementPool, replacement.reinforcementPool);
         // The temporary player now holds the old data and deletes it when this function ends.
     }
     return *this;
@@ -304,4 +306,23 @@ ostream& operator<<(ostream& out, const Player& p) {
     //print out orders
     out << "Orders:" << endl << *(p.ordersList) << endl;
     return out;
+}
+
+// Reinforcement pool management for Assignment 2.
+int Player::getReinforcementPool() const {
+    return reinforcementPool;
+}
+
+void Player::setReinforcementPool(int armies) {
+    if (armies >= 0) {
+        reinforcementPool = armies;
+    }
+}
+
+bool Player::useReinforcements(int armies) {
+    if (armies <= 0 || armies > reinforcementPool) {
+        return false;
+    }
+    reinforcementPool -= armies;
+    return true;
 }
