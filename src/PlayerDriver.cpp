@@ -225,7 +225,8 @@ void testPlayerCopiesSurviveSource(bool assignment, bool ownedReferences) {
     Continent continent("Canada", 5);
     Player carol;
     carol.setName("Carol");
-    Territory manitoba(3, "Manitoba", &continent);
+    const int idBase = 100 + (assignment ? 20 : 0) + (ownedReferences ? 10 : 0);
+    Territory manitoba(idBase + 3, "Manitoba", &continent);
     manitoba.setOwner(&carol);
     unique_ptr<Player> bob;
     vector<string> storedText;
@@ -233,8 +234,8 @@ void testPlayerCopiesSurviveSource(bool assignment, bool ownedReferences) {
         Player alice;
         alice.setName("Alice");
         alice.setReinforcementPool(20);
-        Territory ontario(1, "Ontario", &continent);
-        Territory quebec(2, "Quebec", &continent);
+        Territory ontario(idBase + 1, "Ontario", &continent);
+        Territory quebec(idBase + 2, "Quebec", &continent);
         ontario.setArmyCount(10);
         ontario.addAdjacentTerritory(&quebec);
         ontario.addAdjacentTerritory(&manitoba);
@@ -268,7 +269,7 @@ void testPlayerCopiesSurviveSource(bool assignment, bool ownedReferences) {
         orders->addOrder(new Deploy());
         orders->addOrder(new Bomb());
         for (int index = 0; index < 6; ++index) {
-            if (index == 0 || index == 2 || index == 3 || index == 5)
+            if (index == 0 || index == 2 || index == 5)
                 executeForPlayerCopy(orders->getOrder(index));
         }
         for (int index = 0; index < 11; ++index) {
@@ -311,7 +312,7 @@ void testPlayerCopiesSurviveSource(bool assignment, bool ownedReferences) {
     for (int index = 0; index < 6; ++index) {
         Order* order = bob->getOrdersList()->getOrder(index);
         checkPlayerCopy(order->validate(), scenario + " survives Alice for order " + to_string(index));
-        executeForPlayerCopy(order);
+        if (index != 3) executeForPlayerCopy(order); // Blockade removes Quebec; execute after transfer checks.
         if (index == 0) {
             checkPlayerCopy(territories[0]->getArmyCount() == 10 &&
                             bob->getReinforcementPool() == 14,
@@ -319,8 +320,10 @@ void testPlayerCopiesSurviveSource(bool assignment, bool ownedReferences) {
         }
         const string expectedEffect = index == 0 ? "Effect: Deployed" :
                                       (index == 1 ? "Effect: Advanced" :
-                                      (index == 4 ? "Effect: Airlifted" : "Effect: Simulated"));
-        checkPlayerCopy(orderText(order).find(expectedEffect) != string::npos,
+                                      (index == 2 ? "Effect: Bombed" :
+                                      (index == 3 ? "Effect: Blockaded" :
+                                      (index == 4 ? "Effect: Airlifted" : "Effect: Negotiation"))));
+        if (index != 3) checkPlayerCopy(orderText(order).find(expectedEffect) != string::npos,
                         scenario + " executes copied order " + to_string(index));
     }
     Order* partnerOrder = bob->getOrdersList()->getOrder(7);
@@ -347,6 +350,13 @@ void testPlayerCopiesSurviveSource(bool assignment, bool ownedReferences) {
     Player& self = *bob;
     *bob = self;
     checkPlayerCopy(bob->getTerritoryList()[0] == territories[0], scenario + " supports self-assignment");
+    Order* blockade = bob->getOrdersList()->getOrder(3);
+    checkPlayerCopy(blockade->validate(), scenario + " blockade valid before execution");
+    executeForPlayerCopy(blockade);
+    checkPlayerCopy(!bob->ownsTerritory(territories[1]) &&
+                    territories[1]->getOwner() != bob.get() &&
+                    territories[1]->getArmyCount() == 12,
+                    scenario + " blockade doubles armies and transfers ownership");
     cout << "PASS: Player " << scenario << " survives source destruction with contextual orders\n";
 }
 

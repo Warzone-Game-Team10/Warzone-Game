@@ -21,6 +21,8 @@ private:
     // NEW: Available armies for deployment
     int reinforcementPool = 0;
     bool conqueredThisTurn = false;
+    bool conquestCardAwardedThisTurn = false;
+    std::vector<Player*> negotiatedPlayers;
 
     // Build the copies for the player that will keep them.
     Player(const Player& original, Player* destination);
@@ -59,6 +61,10 @@ public:
     bool hasConqueredThisTurn() const;
     void resetConqueredThisTurn();
     void flagConquest();
+    bool awardConquestCard(Deck& deck);
+    void negotiateWith(Player& other);
+    bool isNegotiatingWith(const Player& other) const;
+    void resetTurnState();
 
     //==========ASSIGNMENT FUNCTION==================
 

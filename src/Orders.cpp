@@ -328,6 +328,8 @@ bool Advance::validate() {
         source->getId() == target->getId()) return false;
     Territory* actualSource = findOwnedTerritory(issuer, source);
     if (!actualSource || armyCount > actualSource->getArmyCount()) return false;
+    Player* defender = target->getOwner();
+    if (defender && defender != issuer && issuer->isNegotiatingWith(*defender)) return false;
     for (Territory* adjacent : actualSource->getAdjacentTerritories()) {
         if (adjacent && adjacent->getId() == target->getId()) return true;
     }
@@ -447,7 +449,14 @@ bool Bomb::validate() {
 // Execution Method
 void Bomb::execute() {
     if (validateExecution()) {
-        recordEffect("bombing of " + target->getName());
+        Player* defender = target->getOwner();
+        Territory* actualTarget = findOwnedTerritory(defender, target);
+        if (!actualTarget) actualTarget = target; // Support map territories not cloned into the owner list.
+        if (actualTarget) {
+            actualTarget->setArmyCount(actualTarget->getArmyCount() / 2);
+            recordRealEffect("Bombed " + actualTarget->getName() + "; remaining armies: " +
+                             std::to_string(actualTarget->getArmyCount()) + ".");
+        }
     }
 
     notify(this);// notify observer
@@ -513,7 +522,14 @@ bool Blockade::validate() {
 // Execution Method
 void Blockade::execute() {
     if (validateExecution()) {
-        recordEffect("blockade of " + target->getName());
+        Territory* actualTarget = findOwnedTerritory(issuer, target);
+        // The neutral player persists for the duration of the game process.
+        static Player neutral("Neutral", nullptr, nullptr, {});
+        if (actualTarget && issuer->transferTerritoryTo(neutral, actualTarget->getId())) {
+            actualTarget->setArmyCount(actualTarget->getArmyCount() * 2);
+            recordRealEffect("Blockaded " + actualTarget->getName() +
+                             "; doubled armies and transferred to Neutral.");
+        }
     }
 
     notify(this);// notify observer
@@ -629,7 +645,9 @@ bool Negotiate::validate() {
 // Execution Method
 void Negotiate::execute() {
     if (validateExecution()) {
-        recordEffect("negotiation between " + issuer->getName() + " and " + partner->getName());
+        issuer->negotiateWith(*partner);
+        recordRealEffect("Negotiation between " + issuer->getName() + " and " +
+                         partner->getName() + " prevents mutual attacks this turn.");
     }
 
     notify(this);// notify observer

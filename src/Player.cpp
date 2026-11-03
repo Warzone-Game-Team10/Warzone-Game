@@ -5,6 +5,7 @@
 #include <memory>
 #include <unordered_map>
 #include <utility>
+#include <algorithm>
 
 #include "Player.h"
 #include "Cards.h"
@@ -52,7 +53,8 @@ Player::Player(const Player& original) : Player(original, this) {}
 // Assignment can prepare the copies before giving them to the destination player.
 Player::Player(const Player& original, Player* destination)
     : name(original.name), territoryList(), cardHand(nullptr), ordersList(nullptr),
-      reinforcementPool(original.reinforcementPool), conqueredThisTurn(original.conqueredThisTurn) {
+      reinforcementPool(original.reinforcementPool), conqueredThisTurn(original.conqueredThisTurn),
+      conquestCardAwardedThisTurn(original.conquestCardAwardedThisTurn) {
     // These temporary copies clean themselves up if any step fails.
     // Store them here only after the whole copy is ready.
     auto handCopy = std::make_unique<Hand>(*original.cardHand);
@@ -103,6 +105,8 @@ Player& Player::operator=(const Player& other) {
         std::swap(ordersList, replacement.ordersList);
         std::swap(reinforcementPool, replacement.reinforcementPool);
         std::swap(conqueredThisTurn, replacement.conqueredThisTurn);
+        std::swap(conquestCardAwardedThisTurn, replacement.conquestCardAwardedThisTurn);
+        negotiatedPlayers.clear();
         // The temporary player now holds the old data and deletes it when this function ends.
     }
     return *this;
@@ -110,6 +114,7 @@ Player& Player::operator=(const Player& other) {
 
 //destructor
 Player::~Player(){
+    resetTurnState();
     delete cardHand;
     delete ordersList;
     deleteAllTerritories();
@@ -159,8 +164,38 @@ bool Player::transferTerritoryTo(Player& recipient, int territoryId) {
 }
 
 bool Player::hasConqueredThisTurn() const { return conqueredThisTurn; }
-void Player::resetConqueredThisTurn() { conqueredThisTurn = false; }
+void Player::resetConqueredThisTurn() { conqueredThisTurn = false; conquestCardAwardedThisTurn = false; }
 void Player::flagConquest() { conqueredThisTurn = true; }
+// A conquest earns one card, regardless of how many territories were captured.
+bool Player::awardConquestCard(Deck& deck) {
+    if (!conqueredThisTurn || conquestCardAwardedThisTurn || !cardHand) return false;
+    Card* reward = deck.draw();
+    if (!reward) return false;
+    cardHand->addCard(reward);
+    conquestCardAwardedThisTurn = true;
+    return true;
+}
+
+void Player::negotiateWith(Player& other) {
+    if (&other == this) return;
+    if (!isNegotiatingWith(other)) negotiatedPlayers.push_back(&other);
+    if (!other.isNegotiatingWith(*this)) other.negotiatedPlayers.push_back(this);
+}
+
+bool Player::isNegotiatingWith(const Player& other) const {
+    return std::find(negotiatedPlayers.begin(), negotiatedPlayers.end(), &other) != negotiatedPlayers.end();
+}
+
+void Player::resetTurnState() {
+    resetConqueredThisTurn();
+    for (Player* other : negotiatedPlayers) {
+        if (!other) continue;
+        auto& links = other->negotiatedPlayers;
+        links.erase(std::remove(links.begin(), links.end(), this), links.end());
+    }
+    negotiatedPlayers.clear();
+}
+
 
 //check if player own this territory
 bool Player::ownsTerritory(Territory* territory) {

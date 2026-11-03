@@ -202,7 +202,7 @@ void testOwnedTargetValidation() {
 
     Blockade validBlockade(&issuer, owned);
     checkValidation(validBlockade.validate(), "Blockade ownership validation preserved");
-    checkExecution(validBlockade, true, "Blockade remains simulated for Issue #28");
+    checkExecution(validBlockade, true, "Blockade transfers owned territory to Neutral");
 }
 
 // Real transfer, combat, and conquest regression tests.
@@ -346,9 +346,9 @@ void testInteractionValidation() {
     negotiateAssigned = Negotiate(&opponent, &issuer);
     checkValidation(!bombAssigned.validate() && negotiateAssigned.validate(), "Interaction assignment replaces target or partner");
 
-    checkValidation(enemy->getArmyCount() == 8 && enemy->getOwner() == &opponent &&
+    checkValidation(enemy->getArmyCount() == 4 && enemy->getOwner() == &opponent &&
           issuer.getTerritoryList().size() == 2 && opponent.getTerritoryList().size() == 2,
-          "Interaction execution leaves armies and ownership unchanged");
+          "Bomb changes armies without changing ownership");
     // Removing the issuer's territories leaves the opponent target alive.
     issuer.setTerritoryList({});
     checkValidation(!bombCopy.validate(), "Bomb copies see current issuer territories");
