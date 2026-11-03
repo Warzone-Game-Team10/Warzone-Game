@@ -872,3 +872,28 @@ void Order::execute() {
     // Derived classes implement their own execution behavior.
 }
 
+
+// ============================================================
+// Rubric 4.2.5: Getter implementations belong in Orders.cpp
+// ============================================================
+
+// Returns the player who issued the Bomb order.
+Player* Bomb::getIssuer() const {
+    return issuer;
+}
+
+// Returns the player who issued the Blockade order.
+Player* Blockade::getIssuer() const {
+    return issuer;
+}
+
+// Returns the player who issued the Airlift order.
+Player* Airlift::getIssuer() const {
+    return issuer;
+}
+
+// Returns the player who issued the Negotiate order.
+Player* Negotiate::getIssuer() const {
+    return issuer;
+}
+

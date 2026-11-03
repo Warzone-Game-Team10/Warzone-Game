@@ -1,4 +1,4 @@
-//Preprocessor directives: These are guards that prevent your file from being read
+﻿//Preprocessor directives: These are guards that prevent your file from being read
 //multiple times by the compiler, which would cause an error.
 
 #ifndef ORDERS_H
@@ -136,7 +136,7 @@ public:
     bool validate() override;
     void execute() override;
 
-    Player* getIssuer() const { return issuer; }
+    Player* getIssuer() const;
 
 private:
     // Borrowed links: these objects must outlive the order and all its copies.
@@ -164,7 +164,7 @@ public:
 
     bool validate() override;
     void execute() override;
-    Player* getIssuer() const { return issuer; }
+    Player* getIssuer() const;
 
 private:
     // Borrowed links: these objects must outlive the order and all its copies.
@@ -191,7 +191,7 @@ public:
 
     bool validate() override;
     void execute() override;
-    Player* getIssuer() const { return issuer; }
+    Player* getIssuer() const;
 
 private:
     // Borrowed links: these objects must outlive the order and all its copies.
@@ -220,7 +220,7 @@ public:
 
     bool validate() override;
     void execute() override;
-    Player* getIssuer() const { return issuer; }
+    Player* getIssuer() const;
 
 private:
     // Borrowed links: these players must outlive the order and all its copies.
@@ -286,7 +286,7 @@ private:
   this is called operator overloading. You are giving an existing operator (like <<) a brand-new behavior
 
   (Parameter 1): This is the left side of the arrow. It's usually std::cout.
-  (Parameter 2): This is the right side of the arrow—the actual object you want
+  (Parameter 2): This is the right side of the arrowâ€”the actual object you want
 */
 // =========================================
 
@@ -313,3 +313,4 @@ std::cout << myOrder; // Error:The compiler has no idea what an "Order" looks li
 
 
 #endif
+
