@@ -259,28 +259,42 @@ vector<Territory*> Player::toAttack(){
 }
 
 //creates an Order object and puts it in the player's list of orders
-void Player::issueOrder(string orderType){
-    Order* newOrder = nullptr;      // will point at whichever order we build
+// Issue a normal order.
+// Card-only orders must be issued through their corresponding cards.
+void Player::issueOrder(string orderType) {
+    Order* newOrder = nullptr;
 
     if (orderType == "Deploy") {
         newOrder = new Deploy();
-    } else if (orderType == "Advance") {
+    }
+    else if (orderType == "Advance") {
         newOrder = new Advance();
-    } else if (orderType == "Bomb") {
-        newOrder = new Bomb();
-    } else if (orderType == "Blockade") {
-        newOrder = new Blockade();
-    } else if (orderType == "Airlift") {
-        newOrder = new Airlift();
-    } else if (orderType == "Negotiate") {
-        newOrder = new Negotiate();
-    } else {
+    }
+    else if (
+        orderType == "Bomb" ||
+        orderType == "Blockade" ||
+        orderType == "Airlift" ||
+        orderType == "Negotiate"
+    ) {
+        cout << "Cannot issue " << orderType
+             << " directly. A corresponding card is required."
+             << endl;
+        return;
+    }
+    else {
         cout << "Unknown order type: " << orderType << endl;
-        return;  // build nothing, add nothing
+        return;
     }
 
-    ordersList->addOrder(newOrder); // the list now OWNS this order
+    if (ordersList == nullptr) {
+        delete newOrder;
+        cout << "Cannot issue order: no OrdersList." << endl;
+        return;
+    }
+
+    ordersList->addOrder(newOrder);
 }
+
 
 
 //=======GETTER

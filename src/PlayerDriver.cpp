@@ -405,21 +405,47 @@ void testPlayerAssignmentFailurePreservesDestination() {
 void testEmptyPlayerCopiesAndIncompleteOrders() {
     Player alice;
     Player bob(alice);
+
     Territory ontario(1, "Ontario");
     bob.addTerritory(&ontario);
     bob = alice;
-    checkPlayerCopy(bob.getTerritoryList().empty() && bob.getCardHand()->getSize() == 0,
-                    "empty assignment replaces old territories");
-    for (const string& type : {"Deploy", "Advance", "Bomb", "Blockade", "Airlift", "Negotiate"}) {
-        alice.issueOrder(type);
-    }
+
+    checkPlayerCopy(
+        bob.getTerritoryList().empty() &&
+        bob.getCardHand()->getSize() == 0,
+        "empty assignment replaces old territories"
+    );
+
+    // Normal orders may be issued without cards.
+    alice.issueOrder("Deploy");
+    alice.issueOrder("Advance");
+
+    // Card-only orders must not be issued directly.
+    alice.issueOrder("Bomb");
+    alice.issueOrder("Blockade");
+    alice.issueOrder("Airlift");
+    alice.issueOrder("Negotiate");
+
+    // Explicitly construct incomplete special orders to test
+    // copy behavior independently of card issuance.
+    OrdersList* orders = alice.getOrdersList();
+    orders->addOrder(new Bomb());
+    orders->addOrder(new Blockade());
+    orders->addOrder(new Airlift());
+    orders->addOrder(new Negotiate());
+
     Player copied(alice);
     bob = alice;
+
     for (int index = 0; index < 6; ++index) {
-        checkPlayerCopy(!copied.getOrdersList()->getOrder(index)->validate() &&
-                        !bob.getOrdersList()->getOrder(index)->validate(),
-                        "both copy paths preserve missing context for order " + to_string(index));
+        checkPlayerCopy(
+            !copied.getOrdersList()->getOrder(index)->validate() &&
+            !bob.getOrdersList()->getOrder(index)->validate(),
+            "both copy paths preserve missing context for order " +
+            to_string(index)
+        );
     }
+
     cout << "PASS: Empty Player copies and incomplete orders remain valid objects\n";
 }
 
