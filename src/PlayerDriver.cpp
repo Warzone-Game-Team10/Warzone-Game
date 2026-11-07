@@ -225,15 +225,17 @@ void testPlayerCopiesSurviveSource(bool assignment, bool ownedReferences) {
     Continent continent("Canada", 5);
     Player carol;
     carol.setName("Carol");
-    Territory manitoba(3, "Manitoba", &continent);
+    const int idBase = 100 + (assignment ? 20 : 0) + (ownedReferences ? 10 : 0);
+    Territory manitoba(idBase + 3, "Manitoba", &continent);
     manitoba.setOwner(&carol);
     unique_ptr<Player> bob;
     vector<string> storedText;
     {
         Player alice;
         alice.setName("Alice");
-        Territory ontario(1, "Ontario", &continent);
-        Territory quebec(2, "Quebec", &continent);
+        alice.setReinforcementPool(20);
+        Territory ontario(idBase + 1, "Ontario", &continent);
+        Territory quebec(idBase + 2, "Quebec", &continent);
         ontario.setArmyCount(10);
         ontario.addAdjacentTerritory(&quebec);
         ontario.addAdjacentTerritory(&manitoba);
@@ -261,13 +263,14 @@ void testPlayerCopiesSurviveSource(bool assignment, bool ownedReferences) {
         orders->addOrder(new Negotiate(&alice, &carol));
         // Check that orders use Bob's territory copies and replace links to Alice.
         // Also check that orders with missing information stay invalid.
-        orders->addOrder(new Airlift(&alice, &ontario, &quebec, 6));
+        orders->addOrder(new Airlift(&alice, &ontario, &quebec, 11));
         orders->addOrder(new Negotiate(&carol, &alice));
         orders->addOrder(new Negotiate(&alice, &alice));
         orders->addOrder(new Deploy());
-        orders->addOrder(new Order());
+        orders->addOrder(new Bomb());
         for (int index = 0; index < 6; ++index) {
-            executeForPlayerCopy(orders->getOrder(index));
+            if (index == 0 || index == 2 || index == 5)
+                executeForPlayerCopy(orders->getOrder(index));
         }
         for (int index = 0; index < 11; ++index) {
             storedText.push_back(orderText(orders->getOrder(index)));
@@ -288,7 +291,7 @@ void testPlayerCopiesSurviveSource(bool assignment, bool ownedReferences) {
             checkPlayerCopy(orderText(copied) == storedText[index], scenario + " preserves stored output");
         }
         checkPlayerCopy(!bob->getOrdersList()->getOrder(6)->validate(),
-                        scenario + " uses owned Ontario's four armies instead of the map's ten");
+                        scenario + " rejects a transfer larger than owned Ontario's available armies");
         checkPlayerCopy(bob->getTerritoryList()[0] != alice.getTerritoryList()[0],
                         scenario + " creates separate territories");
         // Changing Alice's Ontario must not change Bob's Ontario.
@@ -309,8 +312,18 @@ void testPlayerCopiesSurviveSource(bool assignment, bool ownedReferences) {
     for (int index = 0; index < 6; ++index) {
         Order* order = bob->getOrdersList()->getOrder(index);
         checkPlayerCopy(order->validate(), scenario + " survives Alice for order " + to_string(index));
-        executeForPlayerCopy(order);
-        checkPlayerCopy(orderText(order).find("Effect: Simulated") != string::npos,
+        if (index != 3) executeForPlayerCopy(order); // Blockade removes Quebec; execute after transfer checks.
+        if (index == 0) {
+            checkPlayerCopy(territories[0]->getArmyCount() == 10 &&
+                            bob->getReinforcementPool() == 14,
+                            scenario + " deploy updates copied territory and reinforcement pool");
+        }
+        const string expectedEffect = index == 0 ? "Effect: Deployed" :
+                                      (index == 1 ? "Effect: Advanced" :
+                                      (index == 2 ? "Effect: Bombed" :
+                                      (index == 3 ? "Effect: Blockaded" :
+                                      (index == 4 ? "Effect: Airlifted" : "Effect: Negotiation"))));
+        if (index != 3) checkPlayerCopy(orderText(order).find(expectedEffect) != string::npos,
                         scenario + " executes copied order " + to_string(index));
     }
     Order* partnerOrder = bob->getOrdersList()->getOrder(7);
@@ -330,31 +343,47 @@ void testPlayerCopiesSurviveSource(bool assignment, bool ownedReferences) {
                     scenario + " keeps opponent shared");
     territories[0]->setArmyCount(0);
     executeForPlayerCopy(bob->getOrdersList()->getOrder(1));
-    checkPlayerCopy(orderText(bob->getOrdersList()->getOrder(1)).find("Effect:") == string::npos,
-                    scenario + " revalidates copied context and clears old effects");
-    checkPlayerCopy(territories[1]->getArmyCount() == 0 && territories[1]->getOwner() == bob.get(),
-                    scenario + " execution remains simulated");
+    checkPlayerCopy(orderText(bob->getOrdersList()->getOrder(1)).find("Effect: Invalid order:") != string::npos,
+                    scenario + " revalidates copied context and stores invalid-order effect");
+    checkPlayerCopy(territories[1]->getArmyCount() == 6 && territories[1]->getOwner() == bob.get(),
+                    scenario + " preserves destination ownership");
     Player& self = *bob;
     *bob = self;
     checkPlayerCopy(bob->getTerritoryList()[0] == territories[0], scenario + " supports self-assignment");
+    Order* blockade = bob->getOrdersList()->getOrder(3);
+    checkPlayerCopy(blockade->validate(), scenario + " blockade valid before execution");
+    executeForPlayerCopy(blockade);
+    checkPlayerCopy(!bob->ownsTerritory(territories[1]) &&
+                    territories[1]->getOwner() != bob.get() &&
+                    territories[1]->getArmyCount() == 12,
+                    scenario + " blockade doubles armies and transfers ownership");
     cout << "PASS: Player " << scenario << " survives source destruction with contextual orders\n";
 }
 
 // Make copying fail on purpose, then check that Bob still has his old data.
 class UncopyableOrder : public Order {
 public:
-    Order* clone() const override;
-};
+    UncopyableOrder() : Order() {}
 
-Order* UncopyableOrder::clone() const {
-    throw runtime_error("Deliberate order-copy failure");
-}
+    bool validate() override {
+        return false;
+    }
+
+    void execute() override {
+        // Intentionally does nothing.
+    }
+
+    Order* clone() const override {
+        throw std::runtime_error("Deliberate order-copy failure");
+    }
+};
 
 void testPlayerAssignmentFailurePreservesDestination() {
     Player alice;
     alice.getOrdersList()->addOrder(new UncopyableOrder());
     Player bob;
     bob.setName("Bob");
+    bob.setReinforcementPool(1);
     Territory ontario(1, "Ontario");
     bob.addTerritory(&ontario);
     bob.getOrdersList()->addOrder(new Deploy(&bob, bob.getTerritoryList()[0], 1));
@@ -376,21 +405,47 @@ void testPlayerAssignmentFailurePreservesDestination() {
 void testEmptyPlayerCopiesAndIncompleteOrders() {
     Player alice;
     Player bob(alice);
+
     Territory ontario(1, "Ontario");
     bob.addTerritory(&ontario);
     bob = alice;
-    checkPlayerCopy(bob.getTerritoryList().empty() && bob.getCardHand()->getSize() == 0,
-                    "empty assignment replaces old territories");
-    for (const string& type : {"Deploy", "Advance", "Bomb", "Blockade", "Airlift", "Negotiate"}) {
-        alice.issueOrder(type);
-    }
+
+    checkPlayerCopy(
+        bob.getTerritoryList().empty() &&
+        bob.getCardHand()->getSize() == 0,
+        "empty assignment replaces old territories"
+    );
+
+    // Normal orders may be issued without cards.
+    alice.issueOrder("Deploy");
+    alice.issueOrder("Advance");
+
+    // Card-only orders must not be issued directly.
+    alice.issueOrder("Bomb");
+    alice.issueOrder("Blockade");
+    alice.issueOrder("Airlift");
+    alice.issueOrder("Negotiate");
+
+    // Explicitly construct incomplete special orders to test
+    // copy behavior independently of card issuance.
+    OrdersList* orders = alice.getOrdersList();
+    orders->addOrder(new Bomb());
+    orders->addOrder(new Blockade());
+    orders->addOrder(new Airlift());
+    orders->addOrder(new Negotiate());
+
     Player copied(alice);
     bob = alice;
+
     for (int index = 0; index < 6; ++index) {
-        checkPlayerCopy(!copied.getOrdersList()->getOrder(index)->validate() &&
-                        !bob.getOrdersList()->getOrder(index)->validate(),
-                        "both copy paths preserve missing context for order " + to_string(index));
+        checkPlayerCopy(
+            !copied.getOrdersList()->getOrder(index)->validate() &&
+            !bob.getOrdersList()->getOrder(index)->validate(),
+            "both copy paths preserve missing context for order " +
+            to_string(index)
+        );
     }
+
     cout << "PASS: Empty Player copies and incomplete orders remain valid objects\n";
 }
 

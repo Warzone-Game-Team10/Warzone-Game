@@ -1,13 +1,15 @@
-#include "Orders.h"
+﻿#include "Orders.h"
 #include "Player.h"
 #include <iostream>
 #include <memory>
 #include <string>
 #include <utility>
+#include <algorithm>
+#include <random>
 #include <sstream>//used for std::ostringstream text; in stringToLog function
 
 //==========================================================================================
-//                  1. PARENT CLASS ( ORDER ) IMPLEMENTATION 
+//                  1. PARENT CLASS ( ORDER ) IMPLEMENTATION
 //==========================================================================================
 
 
@@ -33,23 +35,24 @@ Order::~Order() {
     delete effect;
 }
 
-// ---------- ASSIGNMENT OPERATOR ---------- 
+// ---------- ASSIGNMENT OPERATOR ----------
 Order& Order::operator=(const Order& other) {
     if (this != &other) {
         // Finish allocating both strings before replacing any existing state.
+        std::unique_ptr<std::string> newDescription(
+            other.description ? new std::string(*other.description) : nullptr);
+        std::unique_ptr<std::string> newEffect(
+            other.effect ? new std::string(*other.effect) : nullptr);
         Subject::operator=(other);
-        Order copy(other);
-        std::swap(description, copy.description);
-        std::swap(effect, copy.effect);
-        std::swap(executed, copy.executed);
+        delete description;
+        delete effect;
+        description = newDescription.release();
+        effect = newEffect.release();
+        executed = other.executed;
     }
     return *this;
 }
 
-// Copy through the public interface without losing the dynamic order type.
-Order* Order::clone() const {
-    return new Order(*this);
-}
 
 Deploy* Deploy::clone() const {
     return new Deploy(*this);
@@ -86,6 +89,18 @@ Territory* copiedTerritory(Territory* territory,
     const auto found = territories.find(territory->getId());
     return found == territories.end() ? territory : found->second;
 }
+}
+
+// Resolve the actual territory owned by a player, even when an order
+// was constructed with an original map territory or another alias.
+Territory* findOwnedTerritory(Player* player, Territory* candidate) {
+    if (player == nullptr || candidate == nullptr) return nullptr;
+    for (Territory* owned : player->getTerritoryList()) {
+        if (owned != nullptr && owned->getId() == candidate->getId()) {
+            return owned;
+        }
+    }
+    return nullptr;
 }
 
 void Order::rebindContext(const Player*, Player*,
@@ -151,9 +166,9 @@ void OrdersList::rebindContext(const Player* original, Player* destination,
 }
 
 
-// ------------------- VALIDATE +  EXECUTE METHODS  ------------------- 
+// ------------------- VALIDATE +  EXECUTE METHODS  -------------------
 
-//VALIDATE METHOD : 
+//VALIDATE METHOD :
 
 bool Order::validate(){
     // A generic order has no specific action whose requirements can be checked.
@@ -163,15 +178,18 @@ bool Order::validate(){
 
 
 
-//EXECUTE METHOD : 
+//EXECUTE METHOD :
 
 bool Order::validateExecution() {
     executed = false;
     effect->clear();
+
     if (!validate()) {
-        std::cout << "Order execution failed: invalid order (" << *description << ")." << std::endl;
+        *effect = "Invalid order: " + *description;
+        std::cout << "Order execution failed: " << *effect << std::endl;
         return false;
     }
+
     return true;
 }
 
@@ -181,15 +199,15 @@ void Order::recordEffect(const std::string& action) {
     std::cout << "Executing demonstration: " << *effect << std::endl;
 }
 
-void Order::execute() {
-    if (validateExecution()) {
-        recordEffect("execution of " + *description);
-    }
-    notify(this);// notify observer
+
+void Order::recordRealEffect(const std::string& action) {
+    *effect = action;
+    executed = true;
+    std::cout << "Executing: " << *effect << std::endl;
 }
 
 //=============================================================================================
-//                  2.  CHILD CLASSES IMPLEMENTATION 
+//                  2.  CHILD CLASSES IMPLEMENTATION
 //=============================================================================================
 
 
@@ -216,19 +234,19 @@ Deploy::Deploy(const Deploy& other)
     : Order(other), issuer(other.issuer), target(other.target), armyCount(other.armyCount) {}
 
 
-// Destructor 
+// Destructor
 Deploy::~Deploy() {
-    // the second we get to the end of the closing brace " } " of the child destructor, 
+    // the second we get to the end of the closing brace " } " of the child destructor,
     // C++ automatically jumps up and fires the parent destructor Order::~Order() on its own.
 }
 
 
-// Assignment Operator 
+// Assignment Operator
 Deploy& Deploy::operator=(const Deploy& other){
 
-    // 1. run the safety self-assignment check first 
+    // 1. run the safety self-assignment check first
     if(this != &other){
-        // We call the parent's assignment operator to safely wipe out our old 
+        // We call the parent's assignment operator to safely wipe out our old
         // string allocation and deep-copy other's string allocation.
         Order::operator=(other);
         issuer = other.issuer;
@@ -236,24 +254,32 @@ Deploy& Deploy::operator=(const Deploy& other){
         armyCount = other.armyCount;
     }
     return *this;
-} 
+}
 
 
 // Validate
 bool Deploy::validate() {
-    // Use Player's collection-based ownership rules.
-    return issuer != nullptr && target != nullptr && armyCount > 0 && issuer->ownsTerritory(target);
+    return issuer != nullptr && target != nullptr && armyCount > 0 &&
+           findOwnedTerritory(issuer, target) != nullptr &&
+           issuer->getReinforcementPool() >= armyCount;
 }
 
 
-// Execute 
+// Execute
 void Deploy::execute() {
     if (validateExecution()) {
-        recordEffect("deployment of " + std::to_string(armyCount) + " armies to " + target->getName());
+        Territory* ownedTarget = findOwnedTerritory(issuer, target);
+        // Re-check before changing state; invalid orders leave state untouched.
+        if (ownedTarget != nullptr && issuer->useReinforcements(armyCount)) {
+            ownedTarget->setArmyCount(ownedTarget->getArmyCount() + armyCount);
+            // Keep the order's effect independent of later state changes.
+            // recordEffect's legacy wording says 'Simulated', so set the
+            // real execution message through the new recordRealEffect helper.
+            recordRealEffect("Deployed " + std::to_string(armyCount) +
+                             " armies to " + ownedTarget->getName() + ".");
+        }
     }
-    
-    notify(this);// notify observer
-
+    notify(this); // notify observer
 }
 
 
@@ -262,7 +288,7 @@ void Deploy::execute() {
 
 
 
-// --------------- ADVANCE ORDER --------------- 
+// --------------- ADVANCE ORDER ---------------
 
 // Default constructor: incomplete orders remain queueable.
 Advance::Advance() : Advance(nullptr, nullptr, nullptr, 0) {}
@@ -301,16 +327,14 @@ Advance& Advance::operator=(const Advance& other) {
 
 // Validation Method
 bool Advance::validate() {
-    if (issuer == nullptr || source == nullptr || target == nullptr ||
-        !issuer->ownsTerritory(source) || source->getId() == target->getId() ||
-        armyCount <= 0 || armyCount > source->getArmyCount()) {
-        return false;
-    }
-    // Player clones territories, so compare IDs
-    for (Territory* neighbor : source->getAdjacentTerritories()) {
-        if (neighbor != nullptr && neighbor->getId() == target->getId()) {
-            return true;
-        }
+    if (!issuer || !source || !target || armyCount <= 0 ||
+        source->getId() == target->getId()) return false;
+    Territory* actualSource = findOwnedTerritory(issuer, source);
+    if (!actualSource || armyCount > actualSource->getArmyCount()) return false;
+    Player* defender = target->getOwner();
+    if (defender && defender != issuer && issuer->isNegotiatingWith(*defender)) return false;
+    for (Territory* adjacent : actualSource->getAdjacentTerritories()) {
+        if (adjacent && adjacent->getId() == target->getId()) return true;
     }
     return false;
 }
@@ -319,19 +343,55 @@ bool Advance::validate() {
 // Execution Method
 void Advance::execute() {
     if (validateExecution()) {
-        recordEffect("advance of " + std::to_string(armyCount) + " armies from " + source->getName() + " to " + target->getName());
+        Territory* from = findOwnedTerritory(issuer, source);
+        Territory* friendly = findOwnedTerritory(issuer, target);
+        from->setArmyCount(from->getArmyCount() - armyCount);
+        if (friendly) {
+            friendly->setArmyCount(friendly->getArmyCount() + armyCount);
+            recordRealEffect("Advanced " + std::to_string(armyCount) + " armies from " +
+                             from->getName() + " to " + friendly->getName() + ".");
+        } else {
+            // An enemy's owned copy is authoritative when available.
+            Player* defender = target->getOwner();
+            Territory* destination = defender ? findOwnedTerritory(defender, target) : nullptr;
+            if (!destination) destination = target; // neutral territory
+            const int initialDefenders = destination->getArmyCount();
+            int attackers = armyCount, defenders = initialDefenders;
+            // Independent hits, with simultaneous casualties each round.
+            static std::mt19937 generator(std::random_device{}());
+            std::bernoulli_distribution attackerHit(0.60), defenderHit(0.70);
+            while (attackers > 0 && defenders > 0) {
+                int defenderLosses = 0, attackerLosses = 0;
+                for (int i = 0; i < attackers; ++i) if (attackerHit(generator)) ++defenderLosses;
+                for (int i = 0; i < defenders; ++i) if (defenderHit(generator)) ++attackerLosses;
+                defenders = std::max(0, defenders - defenderLosses);
+                attackers = std::max(0, attackers - attackerLosses);
+            }
+            if (defenders == 0 && attackers > 0) {
+                destination->setArmyCount(attackers);
+                if (defender && defender != issuer && defender->ownsTerritory(destination)) {
+                    defender->transferTerritoryTo(*issuer, destination->getId());
+                } else if (!issuer->ownsTerritory(destination)) {
+                    issuer->addTerritory(destination);
+                    // The map/neutral original is not the owned copy.
+                    destination = findOwnedTerritory(issuer, destination);
+                }
+                issuer->flagConquest();
+                recordRealEffect("Conquered " + destination->getName() + " with " +
+                                 std::to_string(attackers) + " surviving armies.");
+            } else {
+                destination->setArmyCount(defenders);
+                recordRealEffect("Attack on " + destination->getName() + " failed; " +
+                                 std::to_string(defenders) + " defending armies remain.");
+            }
+        }
     }
-    notify(this);// notify observer
-
+    notify(this);
 }
 
 
 
-
-
-
-
-// --------------- BOMB ORDER --------------- 
+// --------------- BOMB ORDER ---------------
 
 // Default constructor: orders remain queueable, but lack the context needed for validation.
 Bomb::Bomb() : Bomb(nullptr, nullptr) {}
@@ -392,7 +452,14 @@ bool Bomb::validate() {
 // Execution Method
 void Bomb::execute() {
     if (validateExecution()) {
-        recordEffect("bombing of " + target->getName());
+        Player* defender = target->getOwner();
+        Territory* actualTarget = findOwnedTerritory(defender, target);
+        if (!actualTarget) actualTarget = target; // Support map territories not cloned into the owner list.
+        if (actualTarget) {
+            actualTarget->setArmyCount(actualTarget->getArmyCount() / 2);
+            recordRealEffect("Bombed " + actualTarget->getName() + "; remaining armies: " +
+                             std::to_string(actualTarget->getArmyCount()) + ".");
+        }
     }
 
     notify(this);// notify observer
@@ -405,7 +472,7 @@ void Bomb::execute() {
 
 
 
-// --------------- BLOCKADE ORDER --------------- 
+// --------------- BLOCKADE ORDER ---------------
 
 // Default constructor
 // Keep existing callers working; an order without context can be queued but is invalid.
@@ -430,7 +497,7 @@ Blockade::Blockade(const Blockade& other)
 
 // destructor
 Blockade::~Blockade() {
-    
+
 }
 
 
@@ -458,9 +525,16 @@ bool Blockade::validate() {
 // Execution Method
 void Blockade::execute() {
     if (validateExecution()) {
-        recordEffect("blockade of " + target->getName());
+        Territory* actualTarget = findOwnedTerritory(issuer, target);
+        // The neutral player persists for the duration of the game process.
+        static Player neutral("Neutral", nullptr, nullptr, {});
+        if (actualTarget && issuer->transferTerritoryTo(neutral, actualTarget->getId())) {
+            actualTarget->setArmyCount(actualTarget->getArmyCount() * 2);
+            recordRealEffect("Blockaded " + actualTarget->getName() +
+                             "; doubled armies and transferred to Neutral.");
+        }
     }
-    
+
     notify(this);// notify observer
 
 }
@@ -469,7 +543,7 @@ void Blockade::execute() {
 
 
 
-// ---------------  AIRLIFT ORDER --------------- 
+// ---------------  AIRLIFT ORDER ---------------
 
 // Default constructor: orders remain queueable, but lack the context needed for validation.
 Airlift::Airlift() : Airlift(nullptr, nullptr, nullptr, 0) {}
@@ -510,29 +584,28 @@ Airlift& Airlift::operator=(const Airlift& other) {
 
 // Validation Method
 bool Airlift::validate() {
-    return issuer != nullptr && source != nullptr && target != nullptr &&
-           issuer->ownsTerritory(source) && source->getId() != target->getId() &&
-           armyCount > 0 && armyCount <= source->getArmyCount();
+    if (!issuer || !source || !target || armyCount <= 0 ||
+        source->getId() == target->getId()) return false;
+    Territory* from = findOwnedTerritory(issuer, source);
+    Territory* to = findOwnedTerritory(issuer, target);
+    return from && to && armyCount <= from->getArmyCount();
 }
 
-
-// Execution Method
 void Airlift::execute() {
     if (validateExecution()) {
-        recordEffect("airlift of " + std::to_string(armyCount) + " armies from " + source->getName() + " to " + target->getName());
+        Territory* from = findOwnedTerritory(issuer, source);
+        Territory* to = findOwnedTerritory(issuer, target);
+        from->setArmyCount(from->getArmyCount() - armyCount);
+        to->setArmyCount(to->getArmyCount() + armyCount);
+        recordRealEffect("Airlifted " + std::to_string(armyCount) + " armies from " +
+                         from->getName() + " to " + to->getName() + ".");
     }
-    
-    notify(this);// notify observer
-
+    notify(this);
 }
 
 
 
-
-
-
-
-// --------------- NEGOTIATE ORDER --------------- 
+// --------------- NEGOTIATE ORDER ---------------
 
 
 // Default constructor: orders remain queueable, but lack the context needed for validation.
@@ -575,9 +648,11 @@ bool Negotiate::validate() {
 // Execution Method
 void Negotiate::execute() {
     if (validateExecution()) {
-        recordEffect("negotiation between " + issuer->getName() + " and " + partner->getName());
+        issuer->negotiateWith(*partner);
+        recordRealEffect("Negotiation between " + issuer->getName() + " and " +
+                         partner->getName() + " prevents mutual attacks this turn.");
     }
-    
+
     notify(this);// notify observer
 
 }
@@ -596,7 +671,7 @@ void Negotiate::execute() {
 // =============================================================================================
 
 
-// default constructor 
+// default constructor
 OrdersList::OrdersList(){
 
 }
@@ -627,14 +702,14 @@ OrdersList::~OrdersList() {
     for (size_t i = 0; i < list.size(); ++i) {
         if (list[i] != nullptr) {
             delete list[i];      // Blows up the object on the heap
-            list[i] = nullptr;   // this is to avoid dangling pointers... 
+            list[i] = nullptr;   // this is to avoid dangling pointers...
         }
     }
     list.clear(); // Empties out the pointer boxes inside the vector array ( makes ur array size = 0 )
 }
 
 
-// assignment operator 
+// assignment operator
 OrdersList& OrdersList::operator=(const OrdersList& other) {
     if (this != &other) {
         Subject::operator=(other);
@@ -647,7 +722,7 @@ OrdersList& OrdersList::operator=(const OrdersList& other) {
 
 
 
-// ADDING AN ORDER  
+// ADDING AN ORDER
 void OrdersList::addOrder(Order* newOrder) {
     if (newOrder != nullptr) {
         list.push_back(newOrder); // this puts the order pointer onto the back of the queue
@@ -721,8 +796,8 @@ void OrdersList::move(int oldIndex, int newIndex) {
 std::ostream& operator<<(std::ostream& outs, const Order& order){
     // We dereference the internal description pointer to print the raw text words
     outs << "Order Description: " << *(order.description);
-    if (order.executed) {
-        outs << " Effect: " << *order.effect;
+    if (order.effect != nullptr && !order.effect->empty()) {
+    outs << " Effect: " << *order.effect;
     }
     return outs;
 }
@@ -730,7 +805,7 @@ std::ostream& operator<<(std::ostream& outs, const Order& order){
 // Overloading << for the OrdersList manager container class
 std::ostream& operator<<(std::ostream& outs, const OrdersList& list) {
     outs << "=== Player Orders List ===\n";
-    
+
     // Safety check: if our list vector is empty, tell the console
     if (list.list.empty()) {
         outs << "(No active orders in queue)\n";
@@ -774,20 +849,51 @@ std::string Order::stringToLog() const {
 
 /*. ==================== ADDITIONAL NOTES ===========================
 
-    The Stack: A temporary, fast memory zone where standard variables are stored. 
+    The Stack: A temporary, fast memory zone where standard variables are stored.
     Objects created here are deleted automatically by the computer when a function ends.
 
 
-    The Heap: A massive pool of permanent system memory. Objects created here using the 
+    The Heap: A massive pool of permanent system memory. Objects created here using the
     keyword new stay in your RAM forever until you manually delete them.
 
 
-    Memory Leak: This happens when you lose or delete a pointer variable on the Stack, 
+    Memory Leak: This happens when you lose or delete a pointer variable on the Stack,
     but leave the allocated data sitting on the Heap. The data becomes trapped in your RAM chips forever.
 
 
-    Dangling Pointer: A pointer variable that still holds an address number, but the data at 
+    Dangling Pointer: A pointer variable that still holds an address number, but the data at
     that address has already been deleted by another part of the program.
 
 
 */
+
+void Order::execute() {
+    // Base definition for the abstract Order class.
+    // Derived classes implement their own execution behavior.
+}
+
+
+// ============================================================
+// Rubric 4.2.5: Getter implementations belong in Orders.cpp
+// ============================================================
+
+// Returns the player who issued the Bomb order.
+Player* Bomb::getIssuer() const {
+    return issuer;
+}
+
+// Returns the player who issued the Blockade order.
+Player* Blockade::getIssuer() const {
+    return issuer;
+}
+
+// Returns the player who issued the Airlift order.
+Player* Airlift::getIssuer() const {
+    return issuer;
+}
+
+// Returns the player who issued the Negotiate order.
+Player* Negotiate::getIssuer() const {
+    return issuer;
+}
+

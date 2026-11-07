@@ -1,3 +1,4 @@
+#include "Issue28Driver.h"
 #include "MapDriver.h"
 #include "CardsDriver.h"
 #include "PlayerDriver.h"
@@ -63,7 +64,7 @@ int main(int argc, char* argv[]) {
         const bool acceptsMapDirectory =
             command == "map" || command == "player" || command == "orders" || command == "all";
         const bool knownComponent =
-            acceptsMapDirectory || command == "cards" || command == "gameengine" || command == "commands"|| command == "logging";
+            acceptsMapDirectory || command == "cards" || command == "gameengine" || command == "commands"|| command == "logging" || command == "issue28";
         if (!knownComponent || argc > 3 ||
             (argc == 3 && (!acceptsMapDirectory || std::string_view(argv[2]).starts_with("-")))) {
             return usageError(argv[0], "Invalid driver or launch arguments.");
@@ -76,6 +77,10 @@ int main(int argc, char* argv[]) {
                   << "Running: " << command << "\n\n";
 
         bool passed = true;
+
+        if (command == "issue28") {
+            passed = testIssue28();
+        }
 
         // Part 1: Map
         if (command == "map" || command == "all") {

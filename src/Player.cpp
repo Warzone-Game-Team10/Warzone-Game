@@ -5,6 +5,7 @@
 #include <memory>
 #include <unordered_map>
 #include <utility>
+#include <algorithm>
 
 #include "Player.h"
 #include "Cards.h"
@@ -51,7 +52,9 @@ Player::Player(const Player& original) : Player(original, this) {}
 
 // Assignment can prepare the copies before giving them to the destination player.
 Player::Player(const Player& original, Player* destination)
-    : name(original.name), territoryList(), cardHand(nullptr), ordersList(nullptr) {
+    : name(original.name), territoryList(), cardHand(nullptr), ordersList(nullptr),
+      reinforcementPool(original.reinforcementPool), conqueredThisTurn(original.conqueredThisTurn),
+      conquestCardAwardedThisTurn(original.conquestCardAwardedThisTurn) {
     // These temporary copies clean themselves up if any step fails.
     // Store them here only after the whole copy is ready.
     auto handCopy = std::make_unique<Hand>(*original.cardHand);
@@ -100,6 +103,10 @@ Player& Player::operator=(const Player& other) {
         territoryList.swap(replacement.territoryList);
         std::swap(cardHand, replacement.cardHand);
         std::swap(ordersList, replacement.ordersList);
+        std::swap(reinforcementPool, replacement.reinforcementPool);
+        std::swap(conqueredThisTurn, replacement.conqueredThisTurn);
+        std::swap(conquestCardAwardedThisTurn, replacement.conquestCardAwardedThisTurn);
+        negotiatedPlayers.clear();
         // The temporary player now holds the old data and deletes it when this function ends.
     }
     return *this;
@@ -107,6 +114,7 @@ Player& Player::operator=(const Player& other) {
 
 //destructor
 Player::~Player(){
+    resetTurnState();
     delete cardHand;
     delete ordersList;
     deleteAllTerritories();
@@ -137,6 +145,57 @@ void Player::addTerritory(Territory* territory) {
     copy->setOwner(this);
     territoryList.push_back(copy);//add the deep copy to the player's list
 }
+
+bool Player::transferTerritoryTo(Player& recipient, int territoryId) {
+    if (&recipient == this) return false;
+    for (auto it = territoryList.begin(); it != territoryList.end(); ++it) {
+        Territory* territory = *it;
+        if (territory && territory->getId() == territoryId) {
+            if (recipient.ownsTerritory(territory)) return false;
+            // Reserve before modifying either player; retain the original pointer.
+            recipient.territoryList.reserve(recipient.territoryList.size() + 1);
+            recipient.territoryList.push_back(territory);
+            territoryList.erase(it);
+            territory->setOwner(&recipient);
+            return true;
+        }
+    }
+    return false;
+}
+
+bool Player::hasConqueredThisTurn() const { return conqueredThisTurn; }
+void Player::resetConqueredThisTurn() { conqueredThisTurn = false; conquestCardAwardedThisTurn = false; }
+void Player::flagConquest() { conqueredThisTurn = true; }
+// A conquest earns one card, regardless of how many territories were captured.
+bool Player::awardConquestCard(Deck& deck) {
+    if (!conqueredThisTurn || conquestCardAwardedThisTurn || !cardHand) return false;
+    Card* reward = deck.draw();
+    if (!reward) return false;
+    cardHand->addCard(reward);
+    conquestCardAwardedThisTurn = true;
+    return true;
+}
+
+void Player::negotiateWith(Player& other) {
+    if (&other == this) return;
+    if (!isNegotiatingWith(other)) negotiatedPlayers.push_back(&other);
+    if (!other.isNegotiatingWith(*this)) other.negotiatedPlayers.push_back(this);
+}
+
+bool Player::isNegotiatingWith(const Player& other) const {
+    return std::find(negotiatedPlayers.begin(), negotiatedPlayers.end(), &other) != negotiatedPlayers.end();
+}
+
+void Player::resetTurnState() {
+    resetConqueredThisTurn();
+    for (Player* other : negotiatedPlayers) {
+        if (!other) continue;
+        auto& links = other->negotiatedPlayers;
+        links.erase(std::remove(links.begin(), links.end(), this), links.end());
+    }
+    negotiatedPlayers.clear();
+}
+
 
 //check if player own this territory
 bool Player::ownsTerritory(Territory* territory) {
@@ -200,28 +259,42 @@ vector<Territory*> Player::toAttack(){
 }
 
 //creates an Order object and puts it in the player's list of orders
-void Player::issueOrder(string orderType){
-    Order* newOrder = nullptr;      // will point at whichever order we build
+// Issue a normal order.
+// Card-only orders must be issued through their corresponding cards.
+void Player::issueOrder(string orderType) {
+    Order* newOrder = nullptr;
 
     if (orderType == "Deploy") {
         newOrder = new Deploy();
-    } else if (orderType == "Advance") {
+    }
+    else if (orderType == "Advance") {
         newOrder = new Advance();
-    } else if (orderType == "Bomb") {
-        newOrder = new Bomb();
-    } else if (orderType == "Blockade") {
-        newOrder = new Blockade();
-    } else if (orderType == "Airlift") {
-        newOrder = new Airlift();
-    } else if (orderType == "Negotiate") {
-        newOrder = new Negotiate();
-    } else {
+    }
+    else if (
+        orderType == "Bomb" ||
+        orderType == "Blockade" ||
+        orderType == "Airlift" ||
+        orderType == "Negotiate"
+    ) {
+        cout << "Cannot issue " << orderType
+             << " directly. A corresponding card is required."
+             << endl;
+        return;
+    }
+    else {
         cout << "Unknown order type: " << orderType << endl;
-        return;  // build nothing, add nothing
+        return;
     }
 
-    ordersList->addOrder(newOrder); // the list now OWNS this order
+    if (ordersList == nullptr) {
+        delete newOrder;
+        cout << "Cannot issue order: no OrdersList." << endl;
+        return;
+    }
+
+    ordersList->addOrder(newOrder);
 }
+
 
 
 //=======GETTER
@@ -304,4 +377,23 @@ ostream& operator<<(ostream& out, const Player& p) {
     //print out orders
     out << "Orders:" << endl << *(p.ordersList) << endl;
     return out;
+}
+
+// Reinforcement pool management for Assignment 2.
+int Player::getReinforcementPool() const {
+    return reinforcementPool;
+}
+
+void Player::setReinforcementPool(int armies) {
+    if (armies >= 0) {
+        reinforcementPool = armies;
+    }
+}
+
+bool Player::useReinforcements(int armies) {
+    if (armies <= 0 || armies > reinforcementPool) {
+        return false;
+    }
+    reinforcementPool -= armies;
+    return true;
 }
