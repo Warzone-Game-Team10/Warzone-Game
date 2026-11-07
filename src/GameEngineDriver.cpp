@@ -10,10 +10,7 @@
 #include <sstream>
 #include <vector>
 
-/**
- * runCommandTransitions reads commands through the processor and executes valid transitions.
- * It prints command effects and stops at eof or the end state
- */
+// reads, validates, & applies cmds until input ends or the engine reaches end state
 void runCommandTransitions(GameEngine& engine, CommandProcessor& processor, std::ostream& out) {
     out << engine << '\n';
     while (!engine.isFinished()) {
@@ -38,7 +35,7 @@ void testGameStates() {
     runCommandTransitions(engine, processor, std::cout);
 }
 
-// test demonstrating and verifying startup phase with scripted commands
+// test with scripted startup scenario and verifies cmd outcomes and resulting game setup
 bool testStartupPhase() {
     std::cout << "===== GAME STARTUP DRIVER =====\n"
               << "Commands: loadmap, validatemap, six addplayer commands, gamestart\n";
@@ -130,6 +127,7 @@ bool testStartupPhase() {
     }
 
     std::istringstream minimumInput(
+        "gamestart\n"
         "loadmap tests/invalid_maps/disconnected_map.map\n"
         "validatemap\n"
         "loadmap nyc/NYC.map\n"
@@ -142,14 +140,23 @@ bool testStartupPhase() {
     CommandProcessor minimumProcessor(minimumInput);
     minimumEngine.setCommandProcessor(&minimumProcessor);
     minimumEngine.startupPhase();
-    const bool invalidMapWasRejected =
+    const bool invalidStateCommandWasRejected =
         minimumProcessor.getCommandCount() >= 2 &&
-        minimumProcessor.getSavedCommand(1)->getEffect().find("map is invalid") !=
+        minimumProcessor.getSavedCommand(0)->getName() == "gamestart" &&
+        minimumProcessor.getSavedCommand(0)->getEffect().find(
+            "not allowed in state 'start'") != std::string::npos &&
+        minimumProcessor.getSavedCommand(1)->getEffect().find(
+            "'start' -> 'map loaded'") != std::string::npos;
+    expect(invalidStateCommandWasRejected,
+           "gamestart is rejected in start and the engine remains able to load a map");
+    const bool invalidMapWasRejected =
+        minimumProcessor.getCommandCount() >= 3 &&
+        minimumProcessor.getSavedCommand(2)->getEffect().find("map is invalid") !=
             std::string::npos;
     expect(invalidMapWasRejected, "disconnected map was rejected and could be replaced");
     const bool minimumWasEnforced =
-        minimumProcessor.getCommandCount() == 8 &&
-        minimumProcessor.getSavedCommand(5)->getEffect().find("at least 2 players") !=
+        minimumProcessor.getCommandCount() == 9 &&
+        minimumProcessor.getSavedCommand(6)->getEffect().find("at least 2 players") !=
             std::string::npos &&
         minimumEngine.getPlayers().size() == 2 &&
         minimumEngine.getCurrentStateName() == "assign reinforcement";

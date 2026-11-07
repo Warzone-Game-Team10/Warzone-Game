@@ -18,13 +18,13 @@ const std::string MAP_DIRECTORY = "maps";
 }
 
 // constructors -----------------------------
-// first state is always start, initiate the map, deck, & cmd processor
+// creates an engine in the start state and initializes its owned deck and transitions
 GameEngine::GameEngine()
     : currentState("start"), gameMap(nullptr), deck(new Deck()), commandProcessor(nullptr) {
     buildTransitions();
 }
 
-// copy constructor (deep copies what the engine owns, shares cmd processor)
+// copy constructor: copies engine state and owned game objs while sharing its cmd processor
 GameEngine::GameEngine(const GameEngine& other)
     : Subject(other),currentState(other.currentState), transitions(other.transitions),
       gameMap(other.gameMap ? new Map(*other.gameMap) : nullptr),
@@ -70,15 +70,17 @@ std::string GameEngine::getCurrentStateName() const {
     return currentState;
 }
 
-// sets the processor the engine reads its commands from
+// setter for cmd processor used to read startup commands
 void GameEngine::setCommandProcessor(CommandProcessor* processor) {
     commandProcessor = processor;
 }
 
+// returns the currently loaded map without transferring ownership
 const Map* GameEngine::getGameMap() const {
     return gameMap;
 }
 
+// returns players in the engine's current play order
 const std::vector<Player*>& GameEngine::getPlayers() const {
     return players;
 }
@@ -188,7 +190,8 @@ void GameEngine::startupPhase() {
     }
 }
 
-// loadmap <filename>: lists the available maps, then loads the chosen one
+
+// lists available map files and loads the map named by the command argument
 bool GameEngine::handleLoadMap(Command& command) {
     std::cout << "Available maps:\n";
     std::error_code error;
@@ -241,7 +244,7 @@ bool GameEngine::handleLoadMap(Command& command) {
     return true;
 }
 
-// validatemap
+// validates currently loaded map
 bool GameEngine::handleValidateMap(Command& command) {
     if (gameMap == nullptr || !gameMap->validate()) {
         command.saveEffect("Error: the map is invalid. Load another map.");
@@ -250,7 +253,8 @@ bool GameEngine::handleValidateMap(Command& command) {
     return true;
 }
 
-// addplayer <playername>: 2 to 6 players
+
+// creates a player from the command argument with max 6 players
 bool GameEngine::handleAddPlayer(Command& command) {
     const std::string playerName = command.getArgument();
     if (playerName.empty()) {
@@ -271,7 +275,8 @@ bool GameEngine::handleAddPlayer(Command& command) {
     return true;
 }
 
-// current game start process according to iteration 2
+// distributes territories, randomizes play order, initializes armies, and deals cards
+// gamestart transition only when this operation succeeds
 bool GameEngine::handleGameStart(Command& command) {
     if (players.size() < 2) {
         command.saveEffect("Error: at least 2 players are needed to start.");
@@ -313,7 +318,7 @@ bool GameEngine::handleGameStart(Command& command) {
     return true;
 }
 
-//Logging Observer part
+// returns the engine's current state for logging.
 string GameEngine::stringToLog( ) const{
     return "Game Engine: " + currentState;
 }
