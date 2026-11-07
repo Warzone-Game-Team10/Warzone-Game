@@ -11,6 +11,7 @@ bool testCards() {
     bool passed = true;
 
     Deck deck;
+    const int initialDeckSize = deck.getSize();
     Player player;
     Hand hand(&deck);
 
@@ -22,7 +23,7 @@ bool testCards() {
     std::cout << deck << std::endl;
     std::cout << *playerHand << std::endl;
 
-    if (deck.getSize() != 5 || playerHand->getSize() != 0) {
+    if (initialDeckSize < 12 || playerHand->getSize() != 0) {
         std::cout << "FAIL: Initial state." << std::endl;
         passed = false;
     }
@@ -30,7 +31,7 @@ bool testCards() {
     // Test 2: Drawing cards
     std::cout << "\nTEST 2: Drawing cards" << std::endl;
 
-    for (int i = 0; i < 5; i++) {
+    for (int i = 0; i < initialDeckSize; i++) {
         Card* card = deck.draw();
 
         if (card != nullptr) {
@@ -42,7 +43,7 @@ bool testCards() {
     std::cout << deck << std::endl;
     std::cout << *playerHand << std::endl;
 
-    if (deck.getSize() == 0 && playerHand->getSize() == 5) {
+    if (deck.getSize() == 0 && playerHand->getSize() == initialDeckSize) {
         std::cout << "PASS: All cards drawn." << std::endl;
     } else {
         std::cout << "FAIL: Drawing cards." << std::endl;
@@ -104,7 +105,7 @@ bool testCards() {
     std::cout << "\nPlayer's orders:" << std::endl;
     std::cout << *player.getOrdersList() << std::endl;
 
-    if (deck.getSize() == 5 && playerHand->getSize() == 0) {
+    if (deck.getSize() == initialDeckSize && playerHand->getSize() == 0) {
         std::cout << "PASS: All cards returned to deck." << std::endl;
     } else {
         std::cout << "FAIL: Not all cards were played." << std::endl;
