@@ -4,7 +4,9 @@
 #include "PlayerDriver.h"
 #include "OrdersDriver.h"
 #include "GameEngineDriver.h"
+#include "GameEngine.h"
 #include "CommandProcessingDriver.h"
+#include "CommandProcessing.h"
 #include "LoggingObserverDriver.h"
 
 #include <exception>
@@ -16,17 +18,20 @@ namespace {
 
 void printUsage(std::ostream& out, const char* program) {
     out << "Usage: " << program << " -console\n"
+        << "       " << program << " -startup\n"
         << "       " << program << " -file <filename>\n"
-        << "       " << program << " [map|player|orders|cards|all] [maps-directory]\n"
+        << "       " << program << " [map|player|orders|cards|startup|all] [maps-directory]\n"
         << "       " << program << " [gameengine|commands]\n"
         << "       " << program << " --help\n"
         << "Defaults: all tests, maps/ directory\n"
-        << "Available components: map, player, orders, cards, gameengine, commands\n"
+        << "Available components: map, player, orders, cards, startup, gameengine, commands\n"
         << "commands: run command-processing tests.\n"
+        << "startup: run the scripted startup-phase demonstration.\n"
         << "all: run all tests.\n"
         << "-console: type game commands in the terminal.\n"
+        << "-startup: interactively run the game startup phase.\n"
         << "-file <filename>: read game commands from a text file.\n"
-        << "Use one option per run. Only -console and gameengine wait for keyboard input.\n";
+        << "Use one option per run. Only -console, -startup, and gameengine wait for keyboard input.\n";
 }
 
 int usageError(const char* program, const char* message) {
@@ -53,6 +58,16 @@ int main(int argc, char* argv[]) {
             demonstrateConsoleCommands();
             return 0;
         }
+        if (command == "-startup") {
+            if (argc != 2) {
+                return usageError(argv[0], "-startup accepts no additional arguments or input modes.");
+            }
+            GameEngine engine;
+            CommandProcessor processor;
+            engine.setCommandProcessor(&processor);
+            engine.startupPhase();
+            return 0;
+        }
         if (command == "-file") {
             if (argc != 3 || std::string_view(argv[2]).empty() || std::string_view(argv[2]).starts_with("-")) {
                 return usageError(argv[0], "-file requires one filename and no additional input mode.");
@@ -64,7 +79,8 @@ int main(int argc, char* argv[]) {
         const bool acceptsMapDirectory =
             command == "map" || command == "player" || command == "orders" || command == "all";
         const bool knownComponent =
-            acceptsMapDirectory || command == "cards" || command == "gameengine" || command == "commands"|| command == "logging" || command == "issue28";
+            acceptsMapDirectory || command == "cards" || command == "startup" ||
+            command == "gameengine" || command == "commands" || command == "logging" || command == "issue28";
         if (!knownComponent || argc > 3 ||
             (argc == 3 && (!acceptsMapDirectory || std::string_view(argv[2]).starts_with("-")))) {
             return usageError(argv[0], "Invalid driver or launch arguments.");
@@ -113,6 +129,13 @@ int main(int argc, char* argv[]) {
             std::cout << "\n=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- Part 4: Cards =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-\n";
 
             if (!testCards()) {
+                passed = false;
+            }
+        }
+
+        if (command == "startup" || command == "all") {
+            std::cout << "\n=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-= Game Startup =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-\n";
+            if (!testStartupPhase()) {
                 passed = false;
             }
         }
