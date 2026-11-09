@@ -1,5 +1,7 @@
-output: MainDriver.o MapDriver.o Map.o CardsDriver.o Cards.o Player.o PlayerDriver.o Orders.o OrdersDriver.o GameEngineDriver.o GameEngine.o CommandProcessing.o CommandProcessingDriver.o LoggingObserver.o LoggingObserverDriver.o
-	g++ MainDriver.o MapDriver.o Map.o CardsDriver.o Cards.o Player.o PlayerDriver.o Orders.o OrdersDriver.o GameEngineDriver.o GameEngine.o CommandProcessing.o CommandProcessingDriver.o LoggingObserver.o LoggingObserverDriver.o -o warzone-tests.exe
+CARD_SMOKE_SRCS = $(filter-out src/MainDriver.cpp,$(wildcard src/*.cpp))
+
+output: MainDriver.o MapDriver.o Map.o CardsDriver.o Cards.o Player.o PlayerDriver.o Orders.o OrdersDriver.o GameEngineDriver.o GameEngine.o CommandProcessing.o CommandProcessingDriver.o LoggingObserver.o LoggingObserverDriver.o Issue28Driver.o
+	g++ MainDriver.o MapDriver.o Map.o CardsDriver.o Cards.o Player.o PlayerDriver.o Orders.o OrdersDriver.o GameEngineDriver.o GameEngine.o CommandProcessing.o CommandProcessingDriver.o LoggingObserver.o LoggingObserverDriver.o Issue28Driver.o -o warzone-tests.exe
 
 MainDriver.o: src/MainDriver.cpp include/MapDriver.h include/CardsDriver.h include/PlayerDriver.h include/OrdersDriver.h include/GameEngineDriver.h include/CommandProcessingDriver.h
 	g++ -std=c++20 -Iinclude -c src/MainDriver.cpp -o MainDriver.o
@@ -46,16 +48,28 @@ LoggingObserver.o: src/LoggingObserver.cpp
 LoggingObserverDriver.o: src/LoggingObserverDriver.cpp
 	g++ -std=c++20 -Iinclude -c src/LoggingObserverDriver.cpp -o LoggingObserverDriver.o
 
+Issue28Driver.o: src/Issue28Driver.cpp include/Issue28Driver.h
+	g++ -std=c++20 -Iinclude -c src/Issue28Driver.cpp -o Issue28Driver.o
+
 run: output
 	./warzone-tests.exe all
 
 run-engine: output
 	./warzone-tests.exe gameengine
 
+card-smoke.exe: tests/CardIntegrationSmokeTest.cpp $(CARD_SMOKE_SRCS)
+	g++ -std=c++20 -Wall -Wextra -Iinclude tests/CardIntegrationSmokeTest.cpp $(CARD_SMOKE_SRCS) -o card-smoke.exe
+
+run-card-smoke: card-smoke.exe
+	./card-smoke.exe
+
+run-startup: output
+	./warzone-tests.exe startup
+
 clean:
-	del /Q *.o warzone-tests.exe 2>NUL
+	del /Q *.o warzone-tests.exe card-smoke.exe 2>NUL
 
 clear: 
-	rm -f *.o warzone-tests.exe	
+	rm -f *.o warzone-tests.exe card-smoke.exe
 
-.PHONY: run run-engine clean
+.PHONY: output run run-engine run-card-smoke run-startup clean clear

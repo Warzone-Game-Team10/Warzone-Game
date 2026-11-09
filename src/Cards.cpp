@@ -141,11 +141,18 @@ std::ostream& operator<<(std::ostream& out, const Card& card) {
 // ==================================================
 
 Deck::Deck() {
-    cards.push_back(new Card(CardType::BOMB));
-    cards.push_back(new Card(CardType::REINFORCEMENT));
-    cards.push_back(new Card(CardType::BLOCKADE));
-    cards.push_back(new Card(CardType::AIRLIFT));
-    cards.push_back(new Card(CardType::DIPLOMACY));
+    const CardType cardTypes[] = {
+        CardType::BOMB,
+        CardType::REINFORCEMENT,
+        CardType::BLOCKADE,
+        CardType::AIRLIFT,
+        CardType::DIPLOMACY
+    };
+    for (const CardType type : cardTypes) {
+        for (int copy = 0; copy < 3; ++copy) {
+            cards.push_back(new Card(type));
+        }
+    }
 
     static bool seeded = false;
 
@@ -268,6 +275,10 @@ Hand& Hand::operator=(const Hand& other) {
     }
 
     return *this;
+}
+
+void Hand::setDeck(Deck* newDeck) {
+    deck = newDeck;
 }
 
 void Hand::addCard(Card* card) {

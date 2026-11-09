@@ -13,3 +13,6 @@ void runCommandTransitions(GameEngine& engine, CommandProcessor& processor, std:
 
 // demonstrates game state transitions using console commands
 void testGameStates();
+
+// runs and verifies the startup phase with a scripted six-player game
+bool testStartupPhase();

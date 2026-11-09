@@ -19,19 +19,28 @@ Currently implemented:
 - C++ compiler (g++) that supports C++20
 - GNU Make installed and available in your terminal
 
-## Build and Run
+## Build and Make Commands
 
-From the project's root directory (where the Makefile is located), run:
+Run these commands from the project root (the directory containing the Makefile).
+GNU Make and a C++20-compatible `g++` compiler are required.
 
-`make run`
+| Command | What it does |
+| --- | --- |
+| `make` | Builds the default target, `output`. |
+| `make output` | Compiles and links the project into `warzone-tests.exe`. |
+| `make run` | Builds `warzone-tests.exe` if needed, then runs its `all` test drivers. |
+| `make run-engine` | Builds the executable if needed, then runs the interactive GameEngine state-transition driver. It waits for commands in the terminal. |
+| `make run-startup` | Builds the executable if needed, then runs the scripted startup-phase demonstration and checks. |
+| `make run-card-smoke` | Builds `card-smoke.exe` from `tests/CardIntegrationSmokeTest.cpp` and the project source files (excluding `MainDriver.cpp`), then runs the card/order integration checks. |
+| `make clean` | Removes generated `.o` files, `warzone-tests.exe`, and `card-smoke.exe` using the Windows `del` command. |
+| `make clear` | Removes the same generated files using `rm`; use this cleanup alias in a Unix-like shell. |
 
-This compiles the source files and runs the Warzone test drivers with the all argument.
+`make run-startup` runs the scripted demonstration. To enter startup commands
+yourself, build with `make output` and run `.\warzone-tests.exe -startup` on
+Windows or `./warzone-tests.exe -startup` on macOS/Linux. For the other
+executable modes, see [Command Processing](#command-processing) or run
+`.\warzone-tests.exe --help`.
 
-The currently available make commands are:
-- `make` or `make output` : Compiles the source files and generates warzone-tests.exe
-- `make run` : Compiles the project if needed, then runs all tests, including command-processing checks
-- `make run-engine` : Compiles the project if needed, then runs test for GameEngine only
-- `make clean` : Removes compiled object files (.o) and the executable
 
 ### Command Processing
 
