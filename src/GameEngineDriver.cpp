@@ -162,6 +162,91 @@ bool testStartupPhase() {
         minimumEngine.getCurrentStateName() == "assign reinforcement";
     expect(minimumWasEnforced, "one player cannot start; two players can");
 
+
+    // true if every territory of the copied map is owned by one of the copy's own players
+    // (never by a player of the original) and has the same owner name as in the original
+    // assumes the map copy keeps the territory order
+    const auto ownersPointToCopy = [](const GameEngine& copy, const GameEngine& original) {
+        const Map* copiedMap = copy.getGameMap();
+        const Map* originalMap = original.getGameMap();
+        if (copiedMap == nullptr || originalMap == nullptr ||
+            copiedMap->getTerritories().size() != originalMap->getTerritories().size()) {
+            return false;
+        }
+        const auto& copiedPlayers = copy.getPlayers();
+        const auto& originalPlayers = original.getPlayers();
+        for (std::size_t index = 0; index < copiedMap->getTerritories().size(); ++index) {
+            Player* copiedOwner = copiedMap->getTerritories()[index]->getOwner();
+            Player* originalOwner = originalMap->getTerritories()[index]->getOwner();
+            const bool ownedByCopy = std::find(copiedPlayers.begin(), copiedPlayers.end(),
+                                               copiedOwner) != copiedPlayers.end();
+            const bool ownedByOriginal = std::find(originalPlayers.begin(), originalPlayers.end(),
+                                                   copiedOwner) != originalPlayers.end();
+            if (!ownedByCopy || ownedByOriginal ||
+                copiedOwner->getName() != originalOwner->getName()) {
+                return false;
+            }
+        }
+        return true;
+    };
+
+    GameEngine copiedEngine(engine);
+    expect(copiedEngine.getPlayers().size() == players.size() &&
+               copiedEngine.getPlayers()[0] != players[0],
+           "copy constructor: the copy has its own players");
+    expect(ownersPointToCopy(copiedEngine, engine),
+           "copy constructor: copied territories are owned by the copied players");
+
+    // assigning over an engine that already owns players and a map also tests freeing the old data
+    minimumEngine = engine;
+    expect(minimumEngine.getPlayers().size() == players.size() &&
+               ownersPointToCopy(minimumEngine, engine),
+           "assignment operator: copied territories are owned by the copied players");
+
+    // true if every player's hand points at the given engine's own deck
+    const auto handsUseEngineDeck = [](const GameEngine& owner) {
+        for (Player* player : owner.getPlayers()) {
+            if (player->getCardHand()->getDeck() != owner.getDeck()) {
+                return false;
+            }
+        }
+        return true;
+    };
+
+    // true if drawing from and returning a card to each hand's deck works (writes through the pointer)
+    const auto deckIsUsableThroughHands = [](const GameEngine& owner) {
+        for (Player* player : owner.getPlayers()) {
+            Deck* handDeck = player->getCardHand()->getDeck();
+            const int sizeBefore = handDeck->getSize();
+            Card* card = handDeck->draw();
+            if (card == nullptr) {
+                return false;
+            }
+            handDeck->returnCard(card);
+            if (handDeck->getSize() != sizeBefore) {
+                return false;
+            }
+        }
+        return true;
+    };
+
+    // the source engine is destroyed while its copies are still alive
+    GameEngine* source = new GameEngine(engine);
+    GameEngine survivorByCopy(*source);
+    GameEngine survivorByAssignment(engine);   // already owns players and a deck, so the old ones are freed too
+    survivorByAssignment = *source;
+    const bool copiesHaveOwnDecks =
+        survivorByCopy.getDeck() != source->getDeck() &&
+        survivorByAssignment.getDeck() != source->getDeck() &&
+        handsUseEngineDeck(survivorByCopy) && handsUseEngineDeck(survivorByAssignment);
+    delete source;
+
+    expect(copiesHaveOwnDecks, "copies: every copied hand points at the copy's own deck");
+    expect(deckIsUsableThroughHands(survivorByCopy),
+           "copy constructor: hands still reach a live deck after the original engine is destroyed");
+    expect(deckIsUsableThroughHands(survivorByAssignment),
+           "assignment operator: hands still reach a live deck after the original engine is destroyed");
+
     std::cout << (passed ? "\nSTARTUP DRIVER PASSED\n" : "\nSTARTUP DRIVER FAILED\n");
     return passed;
 }

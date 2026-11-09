@@ -277,6 +277,10 @@ Hand& Hand::operator=(const Hand& other) {
     return *this;
 }
 
+void Hand::setDeck(Deck* newDeck) {
+    deck = newDeck;
+}
+
 void Hand::addCard(Card* card) {
     if (card == nullptr || hasCard(card)) {
         return;

@@ -29,6 +29,9 @@ private:
     // builds the allowed startup and play transitions
     void buildTransitions();
 
+    // deep copies other's players and points the copied map's territory owners at them
+   void copyPlayersFrom(const GameEngine& other);
+
     // startup command handlers: return true on success OR save an error effect & return false
     bool handleLoadMap(Command& command);
     bool handleValidateMap(Command& command);
@@ -59,6 +62,7 @@ public:
     // read-only access to the game setup for drivers and observers
     const Map* getGameMap() const;
     const std::vector<Player*>& getPlayers() const;
+    const Deck* getDeck() const;
 
     // returns whether the engine has reached the end state
     bool isFinished() const;

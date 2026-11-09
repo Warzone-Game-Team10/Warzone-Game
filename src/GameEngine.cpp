@@ -30,9 +30,7 @@ GameEngine::GameEngine(const GameEngine& other)
       gameMap(other.gameMap ? new Map(*other.gameMap) : nullptr),
       deck(new Deck(*other.deck)),
       commandProcessor(other.commandProcessor) {
-    for (size_t i = 0; i < other.players.size(); i++) {
-        players.push_back(new Player(*other.players[i]));
-    }
+    copyPlayersFrom(other);
 }
 
 // assignment operator
@@ -51,11 +49,31 @@ GameEngine& GameEngine::operator=(const GameEngine& other) {
 
         gameMap = other.gameMap ? new Map(*other.gameMap) : nullptr;
         deck = new Deck(*other.deck);
-        for (size_t i = 0; i < other.players.size(); i++) {
-            players.push_back(new Player(*other.players[i]));
-        }
+        copyPlayersFrom(other);
     }
     return *this;
+}
+
+// deep copies other's players, then points every territory of the copied map at the matching copied player
+// and every copied hand at this engine's own deck, runs after gameMap and deck have been copied
+void GameEngine::copyPlayersFrom(const GameEngine& other) {
+    std::map<const Player*, Player*> copiedPlayers; // original player -> its copy
+    for (size_t i = 0; i < other.players.size(); i++) {
+        Player* copy = new Player(*other.players[i]);
+        copy->getCardHand()->setDeck(deck); // the copied hand must not keep the original engine's deck
+        players.push_back(copy);
+        copiedPlayers[other.players[i]] = copy;
+    }
+
+    if (gameMap == nullptr) {
+        return;
+    }
+    for (const auto& territory : gameMap->getTerritories()) {
+        const auto found = copiedPlayers.find(territory->getOwner());
+        if (found != copiedPlayers.end()) {
+            territory->setOwner(found->second);
+        }
+    }
 }
 
 // destructor
@@ -83,6 +101,10 @@ const Map* GameEngine::getGameMap() const {
 // returns players in the engine's current play order
 const std::vector<Player*>& GameEngine::getPlayers() const {
     return players;
+}
+// returns the engine's own deck without transferring ownership
+const Deck* GameEngine::getDeck() const {
+    return deck;
 }
 
 // game engine content --------------------------

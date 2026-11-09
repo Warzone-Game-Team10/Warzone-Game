@@ -91,6 +91,8 @@ public:
     int getSize() const;
     Deck* getDeck() const;
 
+    void setDeck(Deck* newDeck);
+
     friend std::ostream& operator<<(std::ostream& out,
                                     const Hand& hand);
 };
