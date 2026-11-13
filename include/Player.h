@@ -1,6 +1,4 @@
-
 #pragma once
-
 #include <stdio.h>
 #include <vector>
 #include <string>
@@ -11,95 +9,71 @@
 
 using namespace std;
 
+
 class Player {
-private:
-    string name;
-    vector<Territory*> territoryList;
-    Hand* cardHand;
-    OrdersList* ordersList;
+    private:
+        string name;
+        vector<Territory*> territoryList;
+        Hand* cardHand;
+        OrdersList* ordersList; 
+       
+        // a place to store reinforcement armies : 
+        int reinforcementPool; 
 
-    // NEW: Available armies for deployment
-    int reinforcementPool = 0;
-    bool conqueredThisTurn = false;
-    bool conquestCardAwardedThisTurn = false;
-    std::vector<Player*> negotiatedPlayers;
+        // Build the copies for the player that will keep them.
+        Player(const Player& original, Player* destination);
 
-    // Build the copies for the player that will keep them.
-    Player(const Player& original, Player* destination);
-
-public:
+    public:
     //==========BASIC FUNCTION==================
-
-    // Constructors
-    Player();
-    Player(string name, Hand* cardHand,
-           OrdersList* ordersList,
-           vector<Territory*> territoryList);
-
-    // Copy constructor
-    Player(const Player& p);
-
-    // Assignment operator
-    Player& operator=(const Player& other);
-
-    // Destructor
-    ~Player();
+        //constructors
+        Player();
+        Player(string name, Hand* cardHand, OrdersList* ordersList, vector<Territory*> territoryList);
+         // copy constructor
+        Player(const Player& p);     
+        // assignment operator             
+        Player& operator=(const Player& other);   
+        // destructor     
+        ~Player();  
 
     //=======HELPERS=======
+        // Deletes every Territory object in player's list, then empties the list. 
+        void deleteAllTerritories();
+        //add territories to the players list
+        void addTerritory(Territory* territory);
+        //check if player own this territory
+        bool ownsTerritory(Territory* territory);
 
-    // Deletes every Territory object in player's list,
-    // then empties the list.
-    void deleteAllTerritories();
 
-    // Add territories to the player's list
-    void addTerritory(Territory* territory);
+        void addReinforcementArmies(int armies);
 
-    // Check if player owns this territory
-    bool ownsTerritory(Territory* territory);
-    // Move ownership of the existing territory object (without invalidating pointers).
-    bool transferTerritoryTo(Player& recipient, int territoryId);
-    bool hasConqueredThisTurn() const;
-    void resetConqueredThisTurn();
-    void flagConquest();
-    bool awardConquestCard(Deck& deck);
-    void negotiateWith(Player& other);
-    bool isNegotiatingWith(const Player& other) const;
-    void resetTurnState();
+        void removeReinforcementArmies(int armies);
 
     //==========ASSIGNMENT FUNCTION==================
-
-    // Return territories that are to be defended
-    vector<Territory*> toDefend();
-
-    // Return territories that are to be attacked
-    vector<Territory*> toAttack();
-
-    // Create an Order object and add it to the player's orders list
-    void issueOrder(string orderType);
+        //return a list of territories that are to be defended
+        vector<Territory*> toDefend();
+        //returns a list of territories that are to be attacked.
+        vector<Territory*> toAttack();
+        //creates an Order object and puts it in the player's list of orders
+        void issueOrder(string orderType);
 
     //==========GETTER FUNCTION==================
+        string getName();
+        vector<Territory*> getTerritoryList();
+        Hand* getCardHand();
+        OrdersList* getOrdersList();
 
-    string getName();
-    vector<Territory*> getTerritoryList();
-    Hand* getCardHand();
-    OrdersList* getOrdersList();
-
-    // NEW: Get available reinforcement armies
-    int getReinforcementPool() const;
+        int getReinforcementPool();   // it reads the current value n tells you how many armies are currently sitting in the player's pool
 
     //==========SETTER FUNCTION==================
+        void setName(string name);
+        void setTerritoryList(vector<Territory*> territoryList);
+        void setCardHand(Hand* cardHand);
+        void setOrdersList(OrdersList* ordersList);
 
-    void setName(string name);
-    void setTerritoryList(vector<Territory*> territoryList);
-    void setCardHand(Hand* cardHand);
-    void setOrdersList(OrdersList* ordersList);
+        void setReinforcementPool(int armies);       // it overwrites the value directly 
 
-    // NEW: Reinforcement pool management
-    void setReinforcementPool(int armies);
-    bool useReinforcements(int armies);
 
-    //=====To String========
-
+    //=====To String======== 
     friend ostream& operator<<(ostream& out, const Player& player);
 };
 
