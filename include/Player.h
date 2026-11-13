@@ -66,6 +66,12 @@ public:
     bool isNegotiatingWith(const Player& other) const;
     void resetTurnState();
 
+    //------------ ASSIGNMENT 2 : PART 3 ------------------------------
+
+    void addReinforcementArmies(int armies);
+
+    void removeReinforcementArmies(int armies);
+
     //==========ASSIGNMENT FUNCTION==================
 
     // Return territories that are to be defended

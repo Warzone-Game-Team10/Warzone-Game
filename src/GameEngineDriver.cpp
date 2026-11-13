@@ -250,3 +250,60 @@ bool testStartupPhase() {
     std::cout << (passed ? "\nSTARTUP DRIVER PASSED\n" : "\nSTARTUP DRIVER FAILED\n");
     return passed;
 }
+
+
+
+
+
+// =====================================================================
+// PART 3 DRIVER: Main Game Loop & Gameplay Phases
+// =====================================================================
+void testMainGameLoop() {
+    std::cout << "\n========================================" << std::endl;
+    std::cout << "   TESTING PART 3: GAME PLAY & MAIN LOOP" << std::endl;
+    std::cout << "========================================\n" << std::endl;
+
+    GameEngine engine;
+    std::vector<Player*> players;
+
+    // 1. Create test players
+    Player* alice = new Player();
+    alice->setName("Alice");
+    Player* bob = new Player();
+    bob->setName("Bob");
+
+    players.push_back(alice);
+    players.push_back(bob);
+
+    // 2. Test Reinforcement Phase Calculations & Minimum 3 Rule
+    Continent continent("TestContinent", 5);
+    Territory t1(1, "Territory1", &continent);
+    t1.setOwner(alice);
+    alice->addTerritory(&t1); // Alice has 1 territory (1/3 = 0 base -> should get minimum 3)
+
+    std::cout << "[Test 1] Running reinforcement phase for Alice (1 territory)..." << std::endl;
+    engine.reinforcementPhase(players);
+    std::cout << "-> Alice reinforcement pool: " << alice->getReinforcementPool() << " (Expected at least 3)\n" << std::endl;
+
+    // 3. Test Issue Orders Phase (Deploy-First Rule)
+    // Since Alice has reinforcement pool > 0, her first issued order must be a Deploy
+    std::cout << "[Test 2] Running issue orders phase (Deploy-first rule)..." << std::endl;
+    engine.issueOrdersPhase(players);
+
+    // 4. Test Player Elimination & Win Condition
+    std::cout << "[Test 3] Testing player elimination and win condition..." << std::endl;
+    // Strip Bob of all territories so he gets eliminated
+    bob->deleteAllTerritories();
+    std::cout << "-> Bob's territories cleared. Running mainGameLoop to trigger elimination & win..." << std::endl;
+
+    // Run the main game loop; it will clean up Bob and declare Alice the winner
+    engine.mainGameLoop(players);
+
+    // 5. Cleanup memory
+    delete alice;
+    delete bob;
+
+    std::cout << "\n========================================" << std::endl;
+    std::cout << "   PART 3 DRIVER TESTS COMPLETED" << std::endl;
+    std::cout << "========================================\n" << std::endl;
+}

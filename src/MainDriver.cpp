@@ -20,11 +20,11 @@ void printUsage(std::ostream& out, const char* program) {
     out << "Usage: " << program << " -console\n"
         << "       " << program << " -startup\n"
         << "       " << program << " -file <filename>\n"
-        << "       " << program << " [map|player|orders|cards|startup|all] [maps-directory]\n"
+        << "       " << program << " [map|player|orders|cards|startup|gameplay|all] [maps-directory]\n"
         << "       " << program << " [gameengine|commands]\n"
         << "       " << program << " --help\n"
         << "Defaults: all tests, maps/ directory\n"
-        << "Available components: map, player, orders, cards, startup, gameengine, commands\n"
+        << "Available components: map, player, orders, cards, startup, gameplay, gameengine, commands\n"
         << "commands: run command-processing tests.\n"
         << "startup: run the scripted startup-phase demonstration.\n"
         << "all: run all tests.\n"
@@ -79,7 +79,7 @@ int main(int argc, char* argv[]) {
         const bool acceptsMapDirectory =
             command == "map" || command == "player" || command == "orders" || command == "all";
         const bool knownComponent =
-            acceptsMapDirectory || command == "cards" || command == "startup" ||
+            acceptsMapDirectory || command == "cards" || command == "startup" || command == "gameplay" ||
             command == "gameengine" || command == "commands" || command == "logging" || command == "issue28";
         if (!knownComponent || argc > 3 ||
             (argc == 3 && (!acceptsMapDirectory || std::string_view(argv[2]).starts_with("-")))) {
@@ -139,6 +139,14 @@ int main(int argc, char* argv[]) {
                 passed = false;
             }
         }
+
+        // ASSIGNMENT 2 : PART 3 ...
+        if (command == "gameplay" || command == "all") {
+            std::cout << "\n=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-= Part 3: Game Play & Main Loop =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-\n";
+            testMainGameLoop();
+        }
+
+
 
         // Part 5: Game Engine
         // doesnt run make run-engine cause it requirse user input

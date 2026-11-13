@@ -296,6 +296,34 @@ void Player::issueOrder(string orderType) {
 }
 
 
+// Adding armies ( during the reinforcement phase )
+void Player::addReinforcementArmies(int armies){
+
+    // make sure the user inputs a positive number... 
+    if(armies > 0 ){
+        reinforcementPool += armies;
+    }
+}
+
+
+// Removing armies ( used later on when we issue deploy orders )
+void Player:: removeReinforcementArmies(int armies){
+
+    // if user inputs a negative number ==> output nothing..
+    if(armies <= 0){
+        return; 
+    }
+
+    // if user inputs a number thats greater than the number of armies they own 
+    if(armies > reinforcementPool){
+        std::cout << " Error: not enough armies in the reinforcement pool! \n ";
+        return; 
+    }
+
+    // otherwise, if they input a valid number : 
+    reinforcementPool -= armies; 
+}
+
 
 //=======GETTER
 //most of these getter returns a point, so make sure to dereferencing it with * to gives the object at that address its pointing at
