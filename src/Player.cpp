@@ -11,6 +11,7 @@
 #include "Cards.h"
 #include "Orders.h"
 #include "Map.h"
+#include "CardOrderIntegration.h"
 
 
 using namespace std;
@@ -55,6 +56,9 @@ Player::Player(const Player& original, Player* destination)
     : name(original.name), territoryList(), cardHand(nullptr), ordersList(nullptr),
       reinforcementPool(original.reinforcementPool), conqueredThisTurn(original.conqueredThisTurn),
       conquestCardAwardedThisTurn(original.conquestCardAwardedThisTurn) {
+    committedDeployArmies = original.committedDeployArmies;
+    issuingStep = original.issuingStep;
+    finishedIssuing = original.finishedIssuing;
     // These temporary copies clean themselves up if any step fails.
     // Store them here only after the whole copy is ready.
     auto handCopy = std::make_unique<Hand>(*original.cardHand);
@@ -101,6 +105,10 @@ Player& Player::operator=(const Player& other) {
         Player replacement(other, this);
         name.swap(replacement.name);
         territoryList.swap(replacement.territoryList);
+        std::swap(ownsTerritoryObjects, replacement.ownsTerritoryObjects);
+        std::swap(committedDeployArmies, replacement.committedDeployArmies);
+        std::swap(issuingStep, replacement.issuingStep);
+        std::swap(finishedIssuing, replacement.finishedIssuing);
         std::swap(cardHand, replacement.cardHand);
         std::swap(ordersList, replacement.ordersList);
         std::swap(reinforcementPool, replacement.reinforcementPool);
@@ -127,7 +135,7 @@ void Player::deleteAllTerritories() {
     //destroy the objects the address is poitnting to
     int count = territoryList.size();
     for (int i = 0; i < count; i++) {
-        delete territoryList[i];
+        if (ownsTerritoryObjects) delete territoryList[i];
     }
     territoryList.clear(); //remove the addresse from the vector list
 }
@@ -141,6 +149,11 @@ void Player::addTerritory(Territory* territory) {
         return;   // if player already have this country return
     }
     
+    if (!ownsTerritoryObjects) {
+        territory->setOwner(this);
+        territoryList.push_back(territory);
+        return;
+    }
     Territory* copy = new Territory(*territory);   // DEEP COPY
     copy->setOwner(this);
     territoryList.push_back(copy);//add the deep copy to the player's list
@@ -261,38 +274,100 @@ vector<Territory*> Player::toAttack(){
 //creates an Order object and puts it in the player's list of orders
 // Issue a normal order.
 // Card-only orders must be issued through their corresponding cards.
+// Compatibility entry point: all decisions still go through the player's policy.
 void Player::issueOrder(string orderType) {
-    Order* newOrder = nullptr;
+    if (orderType == "Deploy" || orderType == "Advance") issueOrder();
+    else cout << "Card orders must be issued by playing a card.\n";
+}
 
-    if (orderType == "Deploy") {
-        newOrder = new Deploy();
-    }
-    else if (orderType == "Advance") {
-        newOrder = new Advance();
-    }
-    else if (
-        orderType == "Bomb" ||
-        orderType == "Blockade" ||
-        orderType == "Airlift" ||
-        orderType == "Negotiate"
-    ) {
-        cout << "Cannot issue " << orderType
-             << " directly. A corresponding card is required."
-             << endl;
-        return;
-    }
-    else {
-        cout << "Unknown order type: " << orderType << endl;
-        return;
-    }
+void Player::bindMapTerritories(const vector<Territory*>& territories) {
+    deleteAllTerritories();
+    ownsTerritoryObjects = false;
+    territoryList = territories;
+    for (Territory* territory : territoryList) territory->setOwner(this);
+}
 
-    if (ordersList == nullptr) {
-        delete newOrder;
-        cout << "Cannot issue order: no OrdersList." << endl;
-        return;
-    }
+bool Player::borrowsMapTerritories() const { return !ownsTerritoryObjects; }
 
-    ordersList->addOrder(newOrder);
+void Player::releaseNeutralTerritory(Territory* territory) {
+    territoryList.erase(std::remove(territoryList.begin(), territoryList.end(), territory), territoryList.end());
+    territory->setOwner(nullptr);
+}
+
+void Player::beginIssuing() {
+    committedDeployArmies = 0;
+    issuingStep = 0;
+    finishedIssuing = false;
+}
+
+// Simple automatic policy: deploy, one defensive move, one attack, then usable cards.
+// No Order::validate() calls occur here. Execution checks the current game state.
+bool Player::issueOrder() {
+    if (finishedIssuing || territoryList.empty() || !ordersList) return false;
+    vector<Territory*> defend = toDefend();
+    vector<Territory*> attack = toAttack();
+    const int available = reinforcementPool - committedDeployArmies;
+    if (available > 0) {
+        ordersList->addOrder(new Deploy(this, defend.front(), available));
+        committedDeployArmies += available;
+        return true;
+    }
+    if (issuingStep == 0) {
+        ++issuingStep;
+        for (Territory* source : defend) {
+            int armies = source->getArmyCount() + (source == defend.front() ? committedDeployArmies : 0);
+            for (Territory* target : defend) {
+                const auto& adjacent = source->getAdjacentTerritories();
+                if (target != source && armies > 1 && std::any_of(adjacent.begin(), adjacent.end(),
+                    [target](Territory* t) { return t && t->getId() == target->getId(); })) {
+                    ordersList->addOrder(new Advance(this, source, target, 1));
+                    return true;
+                }
+            }
+        }
+    }
+    if (issuingStep == 1) {
+        ++issuingStep;
+        for (Territory* target : attack) {
+            for (Territory* source : defend) {
+                const auto& adjacent = source->getAdjacentTerritories();
+                int armies = source->getArmyCount() + (source == defend.front() ? committedDeployArmies : 0);
+                // Reserve one army for the optional defensive move.
+                if (armies > 1 && std::any_of(adjacent.begin(), adjacent.end(),
+                    [target](Territory* t) { return t && t->getId() == target->getId(); })) {
+                    ordersList->addOrder(new Advance(this, source, target, std::max(1, armies - 1)));
+                    return true;
+                }
+            }
+        }
+    }
+    if (cardHand && cardHand->getDeck()) {
+        for (Card* card : cardHand->getCards()) {
+            Order* order = nullptr;
+            switch (card->getType()) {
+                case CardType::BOMB:
+                    if (!attack.empty()) order = new Bomb(this, attack.front());
+                    break;
+                case CardType::BLOCKADE:
+                    if (defend.size() > 1) order = new Blockade(this, defend.back());
+                    break;
+                case CardType::AIRLIFT:
+                    if (defend.size() > 1) order = new Airlift(this, defend.front(), defend.back(), 1);
+                    break;
+                case CardType::DIPLOMACY:
+                    for (Territory* target : attack) if (target->getOwner()) {
+                        order = new Negotiate(this, target->getOwner()); break;
+                    }
+                    break;
+                case CardType::REINFORCEMENT:
+                    // This handout specifies no reinforcement-card effect; retain it.
+                    break;
+            }
+            if (order && playCardWithOrder(card, this, order)) return true;
+        }
+    }
+    finishedIssuing = true;
+    return false;
 }
 
 
@@ -363,7 +438,7 @@ void Player::setTerritoryList(vector<Territory*> newTerritories) {
     //delete the old territories the player owned.
     int oldCount = oldTerritories.size();
     for (int i = 0; i < oldCount; i++) {
-        delete oldTerritories[i];
+        if (ownsTerritoryObjects) delete oldTerritories[i];
     }
 }
 

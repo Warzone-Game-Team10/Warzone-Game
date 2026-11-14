@@ -19,4 +19,4 @@ bool testStartupPhase();
 
 
 // ( PART 3 ) demonstrates reinforcement, order issuing, execution, player elimination, and win conditions
-void testMainGameLoop();
+bool testMainGameLoop();

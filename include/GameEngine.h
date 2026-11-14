@@ -24,6 +24,11 @@ private:
     Map* gameMap;
     std::vector<Player*> players;
     Deck* deck;
+    // Eliminated engine-owned players stay alive until pending orders are cleared.
+    std::vector<Player*> retiredPlayers;
+    void removeEliminatedPlayers(std::vector<Player*>& active);
+    bool detectWinner(const std::vector<Player*>& active);
+    void clearGame();
     CommandProcessor* commandProcessor;
 
     // builds the allowed startup and play transitions
@@ -82,11 +87,18 @@ public:
      * 1. Reinforcement phase
      * 2. Issue orders phase
      * 3. Execute orders phase
-     * Continues until one player controls all territories or a player is eliminated.
+     * Continues until one player controls all territories; elimination removes only that player.
      * Removes players with no territories.
      * Transitions to win state when game ends.
      */
     void mainGameLoop(std::vector<Player*>& players);
+    // Use the startup player order and map for normal gameplay.
+    void mainGameLoop();
+    void reinforcementPhase();
+    void issueOrdersPhase();
+    void executeOrdersPhase();
+    // Initialize a deterministic map/player setup for demonstrations.
+    void setupGame(const Map& map, const std::vector<std::string>& names);
 
     /**
      * reinforcementPhase() method

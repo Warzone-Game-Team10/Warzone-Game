@@ -66,6 +66,17 @@ int main(int argc, char* argv[]) {
             CommandProcessor processor;
             engine.setCommandProcessor(&processor);
             engine.startupPhase();
+            if (engine.getCurrentStateName() == "assign reinforcement") engine.mainGameLoop();
+            while (engine.getCurrentStateName() == "win") {
+                std::cout << "Enter replay or quit: ";
+                Command* next = processor.getCommand();
+                if (!next) break;
+                if (!engine.processCommand(*next)) continue;
+                if (engine.getCurrentStateName() == "start") {
+                    engine.startupPhase();
+                    if (engine.getCurrentStateName() == "assign reinforcement") engine.mainGameLoop();
+                }
+            }
             return 0;
         }
         if (command == "-file") {
@@ -143,7 +154,7 @@ int main(int argc, char* argv[]) {
         // ASSIGNMENT 2 : PART 3 ...
         if (command == "gameplay" || command == "all") {
             std::cout << "\n=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-= Part 3: Game Play & Main Loop =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-\n";
-            testMainGameLoop();
+            passed = testMainGameLoop() && passed;
         }
 
 

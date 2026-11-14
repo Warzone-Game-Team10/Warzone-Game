@@ -1,4 +1,4 @@
-﻿#include "Orders.h"
+#include "Orders.h"
 #include "Player.h"
 #include <iostream>
 #include <memory>
@@ -526,7 +526,14 @@ bool Blockade::validate() {
 void Blockade::execute() {
     if (validateExecution()) {
         Territory* actualTarget = findOwnedTerritory(issuer, target);
-        // The neutral player persists for the duration of the game process.
+        if (actualTarget && issuer->borrowsMapTerritories()) {
+            actualTarget->setArmyCount(actualTarget->getArmyCount() * 2);
+            issuer->releaseNeutralTerritory(actualTarget);
+            recordRealEffect("Blockaded " + actualTarget->getName() + "; transferred to neutral ownership.");
+            notify(this);
+            return;
+        }
+        // Standalone driver territories are owned by players, so retain their owner.
         static Player neutral("Neutral", nullptr, nullptr, {});
         if (actualTarget && issuer->transferTerritoryTo(neutral, actualTarget->getId())) {
             actualTarget->setArmyCount(actualTarget->getArmyCount() * 2);
@@ -897,3 +904,5 @@ Player* Negotiate::getIssuer() const {
     return issuer;
 }
 
+
+int OrdersList::getSize() const { return static_cast<int>(list.size()); }
