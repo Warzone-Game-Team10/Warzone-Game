@@ -62,8 +62,11 @@ int main(int argc, char* argv[]) {
             if (argc != 2) {
                 return usageError(argv[0], "-startup accepts no additional arguments or input modes.");
             }
+            LogObserver::resetLog();
+            LogObserver logger;
             GameEngine engine;
             CommandProcessor processor;
+            engine.attach(&logger);
             engine.setCommandProcessor(&processor);
             engine.startupPhase();
             if (engine.getCurrentStateName() == "assign reinforcement") engine.mainGameLoop();

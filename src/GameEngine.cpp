@@ -98,6 +98,7 @@ std::string GameEngine::getCurrentStateName() const {
 // setter for cmd processor used to read startup commands
 void GameEngine::setCommandProcessor(CommandProcessor* processor) {
     commandProcessor = processor;
+    if (processor) for (Observer* observer : getObservers()) processor->attach(observer);
 }
 
 // returns the currently loaded map without transferring ownership
@@ -302,6 +303,7 @@ bool GameEngine::handleAddPlayer(Command& command) {
     OrdersList orders;
     std::unique_ptr<Player> player(
         new Player(playerName, &hand, &orders, std::vector<Territory*>()));
+    for (Observer* observer : getObservers()) player->getOrdersList()->attach(observer);
     players.push_back(player.get());
     player.release();
     return true;

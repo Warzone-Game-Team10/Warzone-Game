@@ -732,9 +732,10 @@ OrdersList& OrdersList::operator=(const OrdersList& other) {
 // ADDING AN ORDER
 void OrdersList::addOrder(Order* newOrder) {
     if (newOrder != nullptr) {
-        list.push_back(newOrder); // this puts the order pointer onto the back of the queue
+        list.push_back(newOrder); // OrdersList now owns the order.
+        for (Observer* observer : getObservers()) newOrder->attach(observer);
+        notify(this);
     }
-    notify(this);// notify observer
 }
 
 
@@ -906,3 +907,15 @@ Player* Negotiate::getIssuer() const {
 
 
 int OrdersList::getSize() const { return static_cast<int>(list.size()); }
+
+// Register observers for both future and already queued orders.
+void OrdersList::attach(Observer* observer) {
+    Subject::attach(observer);
+    for (Order* order : list) order->attach(observer);
+}
+
+// Remove the borrowed registration without deleting the observer.
+void OrdersList::detach(Observer* observer) {
+    Subject::detach(observer);
+    for (Order* order : list) order->detach(observer);
+}

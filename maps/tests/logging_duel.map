@@ -1,0 +1,10 @@
+[continents]
+Duel 1 blue
+
+[countries]
+1 Left 1 10 10
+2 Right 1 20 10
+
+[borders]
+1 2
+2 1

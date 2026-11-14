@@ -31,7 +31,7 @@ public:
     // stream insertion operator
     friend std::ostream& operator<<(std::ostream& out, const Command& command);
 
-    string stringToLog() const override; // Inheriting the function from ILoggable
+    std::string stringToLog() const override; // Inheriting the function from ILoggable
 
 };
 
@@ -58,6 +58,9 @@ public:
     virtual ~CommandProcessor(); // destructor
 
     // reads and saves the next command, or returns nullptr at the end of input
+    // Registrations cover future and already saved commands.
+    void attach(Observer* observer) override;
+    void detach(Observer* observer) override;
     Command* getCommand();
 
     // checks a non-null command against syntax and state rules, saving rejection effects
@@ -75,7 +78,7 @@ public:
     // stream insertion operator
     friend std::ostream& operator<<(std::ostream& out, const CommandProcessor& processor);
 
-    string stringToLog() const override; // Inheriting the function from ILoggable
+    std::string stringToLog() const override; // Inheriting the function from ILoggable
 
 };
 

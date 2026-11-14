@@ -1,68 +1,66 @@
 #pragma once
 
-#include <stdio.h>
-#include <vector>
+#include <iosfwd>
 #include <string>
+#include <vector>
 
-using namespace std; 
-
-class ILoggable;    // forward declaration (Observer only uses a pointer to it)
-class Observer;     // forward declaration
-
-//==== OBSERVER -INTERFACE ====
-//when obser get message it updates
-class Observer{
-    public:
-    virtual ~Observer();
-    //pure virtual that Log observer will need to overide
-    virtual void update(ILoggable* loggable) const = 0;
-};
-
-//======ILOGGABLE - INTERFACE======
-//interface that must be inherited by Order, OrderList, GameEngine, Command, Command processor (subject)
-class ILoggable{
-    public:
+// Interface implemented by every class that can supply a log entry.
+class ILoggable {
+public:
+    ILoggable();
+    ILoggable(const ILoggable& other);
+    ILoggable& operator=(const ILoggable& other);
     virtual ~ILoggable();
-    
-    // pure virtual function providing interface framework.
-    virtual string stringToLog() const = 0;
-
+    // Return the current event's text; no file access belongs in subjects.
+    virtual std::string stringToLog() const = 0;
+    friend std::ostream& operator<<(std::ostream& out, const ILoggable& object);
 };
 
-//=====SUBJECT======
-//when subject changes state it notifies the observer
-class Subject{
-    public:
+// Interface for consumers notified when a subject changes.
+class Observer {
+public:
+    Observer();
+    Observer(const Observer& other);
+    Observer& operator=(const Observer& other);
+    virtual ~Observer();
+    // The subject supplies an ILoggable view of the changed object.
+    virtual void update(ILoggable* loggable) const = 0;
+    friend std::ostream& operator<<(std::ostream& out, const Observer& observer);
+};
 
-    //constructor
+// Owns an independent registration container, but borrows its observers.
+// Applications must keep each observer alive until its subjects are destroyed
+// or detach it first. Copies share observers, not the registration container.
+class Subject {
+public:
     Subject();
-    //deep copy constrcutor
-    Subject(const Subject& other);             
+    Subject(const Subject& other);
     Subject& operator=(const Subject& other);
-    //distructor
-    virtual ~Subject(); //A base class with children should have a virtual destructor, and it is also what makes Subject polymorphic so the driver’s casts compile                         
-    void attach(Observer* observer);
-    void detach(Observer* observer);
-    void notify(ILoggable* loggable);// calls update() on every observer
-    const vector<Observer*>& getObservers() const; // handy to pass observers to child objects
-    friend ostream& operator<<(std::ostream& os, const Subject& s);
+    virtual ~Subject();
+    // Duplicate and null registrations are ignored.
+    virtual void attach(Observer* observer);
+    // Detaching never deletes the borrowed observer.
+    virtual void detach(Observer* observer);
+    // Dispatch the current event to each registered observer.
+    void notify(ILoggable* loggable);
+    // Borrow registrations so processors/lists can wire newly created children.
+    const std::vector<Observer*>& getObservers() const;
+    friend std::ostream& operator<<(std::ostream& out, const Subject& subject);
 private:
-    vector<Observer*>* observers;
+    std::vector<Observer*>* observers;
 };
 
-//=====LOGOBSERVER======
-// Concrete observer: appends to gamelog.txt. and inheriace form Observer
+// Appends subject-supplied entries to gamelog.txt in the current working folder.
 class LogObserver : public Observer {
 public:
-    //constructor
+    // Open without truncation; additional observers preserve current-game entries.
     LogObserver();
-    //copy constructor
     LogObserver(const LogObserver& other);
     LogObserver& operator=(const LogObserver& other);
-
-    //distructor
-    ~LogObserver();
-    void update(ILoggable* loggable) const override;  // open file (ios::app), write stringToLog(), close
-    friend ostream& operator<<(std::ostream& os, const LogObserver& o);
-
+    ~LogObserver() override;
+    // Explicitly start a fresh session before reading its first command.
+    static void resetLog();
+    // Append and flush one event, reporting file errors rather than hiding them.
+    void update(ILoggable* loggable) const override;
+    friend std::ostream& operator<<(std::ostream& out, const LogObserver& observer);
 };

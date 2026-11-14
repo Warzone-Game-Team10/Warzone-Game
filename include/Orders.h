@@ -42,7 +42,7 @@ public:
     virtual void rebindContext(const Player* original, Player* destination,
                               const std::unordered_map<int, Territory*>& territories);
 
-    string stringToLog() const override; // Inheriting the function from ILoggable
+    std::string stringToLog() const override; // Inheriting the function from ILoggable
 
 protected:
 
@@ -241,6 +241,9 @@ public:
     OrdersList(const OrdersList& other);    // copy constructor
     ~OrdersList();                          // destructor
 
+    // Apply registration changes to both the list and its queued orders.
+    void attach(Observer* observer) override;
+    void detach(Observer* observer) override;
     OrdersList& operator=(const OrdersList& other); // assignment operator
 
     // Update the player and territory links in each copied order.
@@ -263,7 +266,7 @@ public:
     // Number of queued orders; avoids using exceptions as loop control.
     int getSize() const;
 
-    string stringToLog() const override; // Inheriting the function from ILoggable
+    std::string stringToLog() const override; // Inheriting the function from ILoggable
 
 private:
     // this is a dynamic vector holding POINTERS to order objects
@@ -303,15 +306,7 @@ std::ostream& operator<<(std::ostream& outs, const OrdersList& list);
 
 
 
-/*
-EXPLAINED (for me)
-Normally, std::cout only knows how to print basic built-in types like integers,
-floats, or strings. If you try to do this:
--  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -
-Order myOrder;
-std::cout << myOrder; // Error:The compiler has no idea what an "Order" looks like on screen.
--  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -
-*/
+
 
 
 #endif
