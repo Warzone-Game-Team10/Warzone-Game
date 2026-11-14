@@ -148,8 +148,7 @@ bool GameEngine::processCommand(const std::string& command) {
         if (edge != state->second.end()) {
             const std::string next = edge->second;
             if (command == "replay" || command == "quit") clearGame();
-            currentState = next;
-            notify(this);
+            transition(next);
             return true;
         }
     }
@@ -354,7 +353,7 @@ bool GameEngine::handleGameStart(Command& command) {
 
 // returns the engine's current state for logging.ß
 string GameEngine::stringToLog( ) const{
-    return "Game Engine: " + currentState;
+    return "Game Engine Transition State: " + currentState;
 }
 
 
@@ -385,6 +384,7 @@ void GameEngine::setupGame(const Map& map, const std::vector<std::string>& names
         Player* player = new Player();
         player->setName(name);
         player->getCardHand()->setDeck(deck);
+        for (Observer* observer : getObservers()) player->getOrdersList()->attach(observer);
         players.push_back(player);
     }
     for (size_t p = 0; p < players.size(); ++p) {
@@ -393,12 +393,11 @@ void GameEngine::setupGame(const Map& map, const std::vector<std::string>& names
             owned.push_back(gameMap->getTerritories()[i].get());
         players[p]->bindMapTerritories(owned);
     }
-    currentState = "assign reinforcement";
+    transition("assign reinforcement");
 }
 
 void GameEngine::reinforcementPhase(std::vector<Player*>& active) {
-    currentState = "assign reinforcement";
-    notify(this);
+    transition("assign reinforcement");
     for (Player* player : active) {
         if (!player || player->getTerritoryList().empty()) continue;
         int bonus = 0;
@@ -420,8 +419,7 @@ void GameEngine::reinforcementPhase(std::vector<Player*>& active) {
 }
 
 void GameEngine::issueOrdersPhase(std::vector<Player*>& active) {
-    currentState = "issue orders";
-    notify(this);
+    transition("issue orders");
     std::vector<bool> passed(active.size(), false);
     for (Player* player : active) if (player) player->beginIssuing();
     bool unfinished = true;
@@ -460,9 +458,9 @@ bool GameEngine::detectWinner(const std::vector<Player*>& active) {
         bool controlsAll = std::all_of(gameMap->getTerritories().begin(), gameMap->getTerritories().end(),
             [player](const auto& t) { return t->getOwner() == player; });
         if (controlsAll) {
-            currentState = "win";
+            transition("win");
             std::cout << "VICTORY! Winner is " << player->getName() << "!\n";
-            notify(this);
+
             return true;
         }
     }
@@ -470,8 +468,7 @@ bool GameEngine::detectWinner(const std::vector<Player*>& active) {
 }
 
 void GameEngine::executeOrdersPhase(std::vector<Player*>& active) {
-    currentState = "execute orders";
-    notify(this);
+    transition("execute orders");
     // Snapshot the roster: elimination must not invalidate round-robin iteration.
     const std::vector<Player*> executionOrder = active;
     bool won = false;
@@ -506,7 +503,7 @@ void GameEngine::executeOrdersPhase(std::vector<Player*>& active) {
         player->awardConquestCard(*deck);
         player->resetTurnState();
     }
-    if (!won) { currentState = "assign reinforcement"; notify(this); }
+    if (!won) { transition("assign reinforcement"); }
 }
 
 void GameEngine::mainGameLoop(std::vector<Player*>& active) {
@@ -524,3 +521,40 @@ void GameEngine::mainGameLoop() { mainGameLoop(players); }
 void GameEngine::reinforcementPhase() { reinforcementPhase(players); }
 void GameEngine::issueOrdersPhase() { issueOrdersPhase(players); }
 void GameEngine::executeOrdersPhase() { executeOrdersPhase(players); }
+
+
+// Update the state and notify observers exactly once.
+void GameEngine::transition(const std::string& newState) {
+    currentState = newState;
+    notify(this);
+}
+
+// Register the observer with the engine and its existing logging subjects.
+void GameEngine::attach(Observer* observer) {
+    if (!observer) return;
+    Subject::attach(observer);
+    if (commandProcessor) commandProcessor->attach(observer);
+    for (Player* player : players) {
+        if (player && player->getOrdersList())
+            player->getOrdersList()->attach(observer);
+    }
+    for (Player* player : retiredPlayers) {
+        if (player && player->getOrdersList())
+            player->getOrdersList()->attach(observer);
+    }
+}
+
+// Remove registrations without deleting the borrowed observer.
+void GameEngine::detach(Observer* observer) {
+    if (!observer) return;
+    if (commandProcessor) commandProcessor->detach(observer);
+    for (Player* player : players) {
+        if (player && player->getOrdersList())
+            player->getOrdersList()->detach(observer);
+    }
+    for (Player* player : retiredPlayers) {
+        if (player && player->getOrdersList())
+            player->getOrdersList()->detach(observer);
+    }
+    Subject::detach(observer);
+}
