@@ -1,7 +1,23 @@
 SaveCommand(): gamestart
+SaveEffect: Command 'gamestart' is not allowed in state 'start'.
 SaveCommand(): loadmap canada.map
+Game Engine Transition State: map loaded
+SaveEffect: Transition: loadmap [canada.map]: 'start' -> 'map loaded'.
 SaveCommand(): validatemap
-SaveCommand(): addplayer Alice
-SaveCommand(): addplayer Bob
-SaveCommand(): gamestart
+Game Engine Transition State: map validated
+SaveEffect: Transition: validatemap: 'map loaded' -> 'map validated'.
 SaveCommand(): wrongCommand
+SaveEffect: Unknown command 'wrongCommand'.
+SaveCommand(): addplayer Alice
+Game Engine Transition State: players added
+SaveEffect: Transition: addplayer [Alice]: 'map validated' -> 'players added'.
+SaveCommand(): addplayer Bob
+Game Engine Transition State: players added
+SaveEffect: Transition: addplayer [Bob]: 'players added' -> 'players added'.
+SaveCommand(): gamestart
+Game Engine Transition State: assign reinforcement
+SaveEffect: Transition: gamestart: 'players added' -> 'assign reinforcement'.
+SaveCommand(): quit
+SaveEffect: Command 'quit' is not allowed in state 'assign reinforcement'.
+AddOrder(): Order Description: Negotiate with Bob.
+Order Executed: Negotiation between Alice and Bob prevents mutual attacks this turn.

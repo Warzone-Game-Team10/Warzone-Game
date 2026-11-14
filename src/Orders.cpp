@@ -726,8 +726,12 @@ OrdersList& OrdersList::operator=(const OrdersList& other) {
 void OrdersList::addOrder(Order* newOrder) {
     if (newOrder != nullptr) {
         list.push_back(newOrder); // this puts the order pointer onto the back of the queue
+        //for observer pattern, attach the observers to the new order
+        for (size_t i = 0; i < getObservers().size(); i++) {
+            newOrder->attach(getObservers()[i]);
+        }
+        notify(this);// notify observer
     }
-    notify(this);// notify observer
 }
 
 

@@ -129,6 +129,12 @@ void GameEngine::buildTransitions() {
     transitions["win"]["quit"] = "end";
 }
 
+// changes the current state and notifies the observers so the new state is logged
+void GameEngine::transition(const std::string& newState) {
+    currentState = newState;
+    notify(this);
+}
+
 // applies a matching transition and returns false if none exists
 bool GameEngine::processCommand(const std::string& command) {
 
@@ -138,7 +144,7 @@ bool GameEngine::processCommand(const std::string& command) {
     if (state != transitions.end()) {
         std::map<std::string, std::string>::const_iterator edge = state->second.find(command);
         if (edge != state->second.end()) {
-            currentState = edge->second;
+            transition(edge->second);
             return true;
         }
     }
@@ -294,6 +300,11 @@ bool GameEngine::handleAddPlayer(Command& command) {
         new Player(playerName, &hand, &orders, std::vector<Territory*>()));
     players.push_back(player.get());
     player.release();
+
+    //for observer pattern, attach the observers to the new player's orders list
+    for (size_t i = 0; i < getObservers().size(); i++) {
+        players.back()->getOrdersList()->attach(getObservers()[i]);
+    }
     return true;
 }
 
@@ -342,5 +353,5 @@ bool GameEngine::handleGameStart(Command& command) {
 
 // returns the engine's current state for logging.
 string GameEngine::stringToLog( ) const{
-    return "Game Engine: " + currentState;
+    return "Game Engine Transition State: " + currentState;
 }
