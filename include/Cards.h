@@ -89,6 +89,8 @@ public:
     void playAll(Player* player);
 
     int getSize() const;
+    // Borrow cards without transferring ownership.
+    const std::vector<Card*>& getCards() const;
     Deck* getDeck() const;
 
     void setDeck(Deck* newDeck);

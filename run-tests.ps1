@@ -1,4 +1,4 @@
-﻿$ErrorActionPreference = "Stop"
+$ErrorActionPreference = "Stop"
 
 Write-Host "`n=== COMP 345 WARZONE TEST SUITE ===" -ForegroundColor Cyan
 
@@ -7,7 +7,7 @@ g++ -std=c++20 -Iinclude src/*.cpp -o warzone-tests.exe
 if ($LASTEXITCODE -ne 0) { throw "Main compilation failed" }
 
 # Run regression tests
-$tests = @("issue28", "orders", "player", "cards")
+$tests = @("issue28", "orders", "player", "cards", "startup", "gameplay")
 $failed = @()
 
 foreach ($test in $tests) {

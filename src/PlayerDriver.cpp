@@ -416,9 +416,10 @@ void testEmptyPlayerCopiesAndIncompleteOrders() {
         "empty assignment replaces old territories"
     );
 
-    // Normal orders may be issued without cards.
-    alice.issueOrder("Deploy");
-    alice.issueOrder("Advance");
+    // Empty players cannot make gameplay decisions. Construct incomplete orders
+    // explicitly for this copy/validation test, rather than using the issuing policy.
+    alice.getOrdersList()->addOrder(new Deploy());
+    alice.getOrdersList()->addOrder(new Advance());
 
     // Card-only orders must not be issued directly.
     alice.issueOrder("Bomb");

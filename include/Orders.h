@@ -1,4 +1,4 @@
-﻿//Preprocessor directives: These are guards that prevent your file from being read
+//Preprocessor directives: These are guards that prevent your file from being read
 //multiple times by the compiler, which would cause an error.
 
 #ifndef ORDERS_H
@@ -260,6 +260,8 @@ public:
 
     // Borrows an order without transferring ownership; throws std::out_of_range for an invalid index.
     Order* getOrder(int index);
+    // Number of queued orders; avoids using exceptions as loop control.
+    int getSize() const;
 
     string stringToLog() const override; // Inheriting the function from ILoggable
 
