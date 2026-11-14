@@ -4,6 +4,7 @@
 #include "GameEngine.h"
 #include "Orders.h"
 #include "Player.h"
+#include "Map.h"
 
 #include <fstream>
 #include <iostream>
@@ -266,7 +267,7 @@ namespace {
 
         // ---------------- LogObserver ----------------
         // It owns no data, so the check is that copying/assigning does NOT empty gamelog.txt
-        // (only the default constructor does that).
+        // (resetLog() is the only operation that clears it).
         {
             std::string logBefore = readLogFile();
 
@@ -422,10 +423,146 @@ namespace {
 
 }
 
+namespace {
+// Verify the exact newly appended bytes, not entries left over from previous tests.
+bool testExactNotifications(LogObserver* logger) {
+    bool passed = true;
+    const auto check = [&passed](bool condition, const std::string& label) {
+        std::cout << "  " << label << ": " << (condition ? "PASS" : "FAIL") << '\n';
+        passed = passed && condition;
+    };
+    const auto expectEntry = [&check](const std::string& before, const std::string& expected,
+                                    const std::string& label) {
+        check(readLogFile() == before + expected + "\n", label);
+    };
+
+    // A second observer and its copies must not destroy the current game log.
+    std::string before = readLogFile();
+    LogObserver second;
+    LogObserver copy(second);
+    LogObserver assigned;
+    assigned = second;
+    check(readLogFile() == before, "constructing/copying/assigning loggers preserves existing entries");
+
+    Map map;
+    Continent* continent = map.addContinent("Demo", 2);
+    Territory* one = map.addTerritory(1, "One", continent);
+    Territory* two = map.addTerritory(2, "Two", continent);
+    Territory* three = map.addTerritory(3, "Three", continent);
+    one->addAdjacentTerritory(two); two->addAdjacentTerritory(one);
+    one->addAdjacentTerritory(three); three->addAdjacentTerritory(one);
+    two->addAdjacentTerritory(three); three->addAdjacentTerritory(two);
+    GameEngine engine;
+    engine.setupGame(map, {"Alice", "Bob"});
+    // Attach after setup as a stronger test of propagation to existing order lists.
+    engine.attach(logger);
+    engine.attach(logger); // Duplicate attachment must not duplicate entries.
+    std::istringstream input("loadmap exact.map\n");
+    CommandProcessor processor(input);
+    engine.setCommandProcessor(&processor);
+
+    before = readLogFile();
+    Command* command = processor.getCommand();
+    expectEntry(before, "SaveCommand(): loadmap exact.map", "saveCommand logs exactly one command entry");
+    before = readLogFile();
+    command->saveEffect("Exact effect");
+    expectEntry(before, "SaveEffect: Exact effect", "saveEffect logs exactly the saved effect once");
+    before = readLogFile();
+    engine.transition("issue orders");
+    expectEntry(before, "Game Engine Transition State: issue orders", "transition logs exactly one new-state entry");
+
+    Player* alice = engine.getPlayers()[0];
+    Player* bob = engine.getPlayers()[1];
+    Territory* target = alice->getTerritoryList()[0];
+    alice->setReinforcementPool(3);
+    before = readLogFile();
+    Deploy* deploy = new Deploy(alice, target, 3);
+    alice->getOrdersList()->addOrder(deploy);
+    expectEntry(before, "AddOrder(): Order Description: Deploy 3 armies to One.",
+                "player list insertion logs the actual configured order exactly once");
+    before = readLogFile();
+    deploy->execute();
+    expectEntry(before, "Order Executed: Deployed 3 armies to One.",
+                "valid execute logs the actual stored effect exactly once");
+    check(target->getArmyCount() == 3, "logged deployment corresponds to a real army change");
+
+    // Every execute override must notify, even when execution validation rejects it.
+    std::vector<Order*> invalidOrders = {new Deploy(), new Advance(), new Bomb(),
+                                       new Blockade(), new Airlift(), new Negotiate()};
+    const std::vector<std::string> descriptions = {"Deploy Order", "Advance Order", "Bomb Order",
+                                                 "Blockade Order", "Airlift Order", "Negotiate Order"};
+    for (size_t i = 0; i < invalidOrders.size(); ++i) {
+        Order* order = invalidOrders[i];
+        alice->getOrdersList()->addOrder(order);
+        before = readLogFile();
+        order->execute();
+        expectEntry(before, "Order Executed: Invalid order: " + descriptions[i],
+                    descriptions[i] + " rejection logs one saved execution effect");
+    }
+
+    before = readLogFile();
+    engine.detach(logger);
+    command->saveEffect("Not logged after detach");
+    engine.transition("execute orders");
+    deploy->execute();
+    check(readLogFile() == before, "engine detach removes child command and order registrations");
+    engine.attach(logger);
+
+    // Lifetime of processor is shorter than engine; detach the borrowed processor pointer.
+    engine.setCommandProcessor(nullptr);
+    (void)bob;
+    return passed;
+}
+
+// Real startup + gameplay path, including order-list wiring and every phase state.
+bool testGameplayLogging(LogObserver* logger) {
+    bool passed = true;
+    const auto check = [&passed](bool value, const std::string& label) {
+        std::cout << "  " << label << ": " << (value ? "PASS" : "FAIL") << '\n';
+        passed = passed && value;
+    };
+    const std::string before = readLogFile();
+    std::istringstream input("loadmap nyc/NYC.map\nvalidatemap\naddplayer Alice\naddplayer Bob\ngamestart\n");
+    CommandProcessor processor(input);
+    GameEngine engine;
+    engine.attach(logger);
+    engine.setCommandProcessor(&processor);
+    engine.startupPhase();
+    check(engine.getPlayers().size() == 2 && engine.getCurrentStateName() == "assign reinforcement",
+          "real startup loads a map and creates both player lists");
+    if (engine.getPlayers().size() != 2) return false;
+    engine.reinforcementPhase();
+    engine.issueOrdersPhase();
+    engine.executeOrdersPhase();
+    const std::string appended = readLogFile().substr(before.size());
+    for (const std::string& text : {"SaveCommand(): loadmap nyc/NYC.map", "SaveEffect: Transition: gamestart",
+            "Game Engine Transition State: map loaded", "Game Engine Transition State: map validated",
+            "Game Engine Transition State: players added", "Game Engine Transition State: assign reinforcement",
+            "Game Engine Transition State: issue orders", "Game Engine Transition State: execute orders",
+            "AddOrder(): Order Description: Deploy", "Order Executed: Deployed"})
+        check(appended.find(text) != std::string::npos, "real gameplay log contains " + text);
+
+    // Real cleanup is retained by the conflict resolution, and logs exactly once.
+    engine.transition("win");
+    const std::string replayBefore = readLogFile();
+    bool replayed = engine.processCommand(std::string("replay"));
+    check(replayed && engine.getPlayers().empty() && engine.getGameMap() == nullptr &&
+          readLogFile() == replayBefore + "Game Engine Transition State: start\n",
+          "replay preserves Part 3 cleanup and emits one start-state log entry");
+    engine.transition("win");
+    const std::string quitBefore = readLogFile();
+    check(engine.processCommand(std::string("quit")) && engine.isFinished() &&
+          readLogFile() == quitBefore + "Game Engine Transition State: end\n",
+          "quit cleans up and logs the end transition exactly once");
+    return passed;
+}
+}
+
 bool testLoggingObserver() {
 
     bool passed = true;
 
+    LogObserver::resetLog();
     LogObserver* logObserver = new LogObserver();
     
     // ------------------------------------------------------------
@@ -462,6 +599,11 @@ bool testLoggingObserver() {
     }
    
 
+
+    std::cout << "\nTEST 5: Exact notifications and registration propagation\n";
+    if (!testExactNotifications(logObserver)) passed = false;
+    std::cout << "\nTEST 6: Real startup and Part 3 integration\n";
+    if (!testGameplayLogging(logObserver)) passed = false;
 
     // The observer was created here, so it is deleted here.
     delete logObserver;

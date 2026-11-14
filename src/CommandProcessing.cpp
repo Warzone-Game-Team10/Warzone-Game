@@ -293,3 +293,14 @@ std::string CommandProcessor::stringToLog() const {
     } 
     return "SaveCommand(): " + history.back()->getText();
 }
+// Attach to all saved commands as well as the command reader.
+void CommandProcessor::attach(Observer* observer) {
+    Subject::attach(observer);
+    for (const auto& command : history) command->attach(observer);
+}
+
+// Detach without transferring or deleting observer ownership.
+void CommandProcessor::detach(Observer* observer) {
+    Subject::detach(observer);
+    for (const auto& command : history) command->detach(observer);
+}

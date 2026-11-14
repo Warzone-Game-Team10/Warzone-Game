@@ -350,3 +350,75 @@ std::ostream& operator<<(std::ostream& out, const Hand& hand) {
 
     return out;
 }
+
+const std::vector<Card*>& Hand::getCards() const { return handCards; }
+
+#include "CardOrderIntegration.h"
+bool playCardWithOrder(
+    Card* card,
+    Player* player,
+    Order* proposedOrder
+) {
+    std::unique_ptr<Order> order(proposedOrder);
+
+    if (!card || !player || !order) {
+        return false;
+    }
+
+    Hand* hand = player->getCardHand();
+    OrdersList* orders = player->getOrdersList();
+
+    if (!hand || !orders || !hand->getDeck()) {
+        return false;
+    }
+
+    if (!hand->hasCard(card)) {
+        return false;
+    }
+
+    bool correctType = false;
+
+    switch (card->getType()) {
+        case CardType::BOMB:
+            correctType =
+                (dynamic_cast<Bomb*>(order.get()) != nullptr && dynamic_cast<Bomb*>(order.get())->getIssuer() == player);
+            break;
+
+        case CardType::BLOCKADE:
+            correctType =
+                (dynamic_cast<Blockade*>(order.get()) != nullptr && dynamic_cast<Blockade*>(order.get())->getIssuer() == player);
+            break;
+
+        case CardType::AIRLIFT:
+            correctType =
+                (dynamic_cast<Airlift*>(order.get()) != nullptr && dynamic_cast<Airlift*>(order.get())->getIssuer() == player);
+            break;
+
+        case CardType::DIPLOMACY:
+            correctType =
+                (dynamic_cast<Negotiate*>(order.get()) != nullptr && dynamic_cast<Negotiate*>(order.get())->getIssuer() == player);
+            break;
+
+        case CardType::REINFORCEMENT:
+            // Reinforcement behavior requires confirmation.
+            return false;
+
+        default:
+            return false;
+    }
+
+    // Check card/type authorization only; validate the order at execution.
+    if (!correctType) {
+        return false;
+    }
+
+    // Transfer order ownership to OrdersList.
+    orders->addOrder(order.get());
+    order.release();
+
+    // Transfer card ownership back to Deck.
+    hand->removeCard(card);
+    hand->getDeck()->returnCard(card);
+
+    return true;
+}

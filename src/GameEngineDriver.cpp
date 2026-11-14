@@ -4,6 +4,7 @@
 #include "Map.h"
 #include "Player.h"
 #include "Cards.h"
+#include "CardOrderIntegration.h"
 
 #include <algorithm>
 #include <numeric>
@@ -248,5 +249,214 @@ bool testStartupPhase() {
            "assignment operator: hands still reach a live deck after the original engine is destroyed");
 
     std::cout << (passed ? "\nSTARTUP DRIVER PASSED\n" : "\nSTARTUP DRIVER FAILED\n");
+    return passed;
+}
+
+
+
+
+
+// =====================================================================
+// PART 3 DRIVER: Main Game Loop & Gameplay Phases
+// =====================================================================
+// Part 3 driver: each required behavior has an explicit expected result.
+bool testMainGameLoop() {
+    bool passed = true;
+    const auto expect = [&passed](bool condition, const std::string& message) {
+        std::cout << (condition ? "PASS: " : "FAIL: ") << message << '\n';
+        passed = passed && condition;
+    };
+    // A connected 12-territory map, with two continents of six territories each.
+    Map map;
+    Continent* west = map.addContinent("West", 5);
+    Continent* east = map.addContinent("East", 2);
+    for (int i = 0; i < 12; ++i) map.addTerritory(i + 1, "T" + std::to_string(i + 1), i < 6 ? west : east);
+    for (const auto& a : map.getTerritories())
+        for (const auto& b : map.getTerritories()) if (a != b) a->addAdjacentTerritory(b.get());
+
+    std::cout << "\n=== Part 3: reinforcement cases ===\n";
+    GameEngine reinforcements;
+    reinforcements.setupGame(map, {"Alice", "Bob"});
+    Player* alice = reinforcements.getPlayers()[0];
+    Player* bob = reinforcements.getPlayers()[1];
+    reinforcements.reinforcementPhase();
+    expect(alice->getReinforcementPool() == 3 && bob->getReinforcementPool() == 3,
+           "six territories without a complete continent: minimum three armies");
+    for (int id : {2, 4, 6}) expect(bob->transferTerritoryTo(*alice, id), "transfer western territory");
+    alice->setReinforcementPool(4);
+    reinforcements.reinforcementPhase();
+    expect(alice->getReinforcementPool() == 12,
+           "nine territories: floor(9/3) + West bonus 5 = 8, added to existing pool 4");
+    for (Territory* t : bob->getTerritoryList()) bob->transferTerritoryTo(*alice, t->getId());
+    alice->setReinforcementPool(0);
+    bob->setReinforcementPool(0);
+    reinforcements.reinforcementPhase();
+    expect(alice->getReinforcementPool() == 11, "twelve territories plus both continent bonuses: 4+5+2=11");
+    expect(bob->getReinforcementPool() == 0, "territoryless player receives no reinforcement");
+
+    std::cout << "\n=== Part 3: player decisions and cards ===\n";
+    GameEngine decisions;
+    decisions.setupGame(map, {"Alice", "Bob"});
+    alice = decisions.getPlayers()[0]; bob = decisions.getPlayers()[1];
+    alice->setReinforcementPool(6);
+    alice->beginIssuing();
+    expect(alice->issueOrder(), "player issues a deploy decision first");
+    expect(dynamic_cast<Deploy*>(alice->getOrdersList()->getOrder(0)) != nullptr,
+           "first order is Deploy while armies remain uncommitted");
+    expect(alice->getReinforcementPool() == 6, "issuing reserves armies; execution will consume the pool");
+    expect(alice->issueOrder() && alice->issueOrder(), "player issues defensive and attacking advances");
+    expect(dynamic_cast<Advance*>(alice->getOrdersList()->getOrder(1)) &&
+           dynamic_cast<Advance*>(alice->getOrdersList()->getOrder(2)),
+           "both decisions create Advance orders using defend/attack lists");
+    // Execute just the first two so movement is deterministic and does not involve combat randomness.
+    Territory* first = alice->toDefend().front();
+    Territory* second = alice->toDefend()[1];
+    alice->getOrdersList()->getOrder(0)->execute(); alice->getOrdersList()->remove(0);
+    alice->getOrdersList()->getOrder(0)->execute(); alice->getOrdersList()->remove(0);
+    expect(first->getArmyCount() == 5 && second->getArmyCount() == 1 && alice->getReinforcementPool() == 0,
+           "deploy and defensive advance change actual map armies correctly");
+    alice->getOrdersList()->remove(0); // Attack execution is demonstrated below against a zero-army target.
+
+    for (CardType type : {CardType::BOMB, CardType::BLOCKADE, CardType::AIRLIFT, CardType::DIPLOMACY}) {
+        GameEngine cards;
+        cards.setupGame(map, {"CardPlayer", "Opponent"});
+        Player* player = cards.getPlayers()[0];
+        Card* card = new Card(type);
+        player->getCardHand()->addCard(card);
+        int deckSize = cards.getDeck()->getSize();
+        player->beginIssuing();
+        while (player->issueOrder()) {}
+        bool found = false;
+        OrdersList* list = player->getOrdersList();
+        for (int i = 0; i < list->getSize(); ++i) {
+            Order* order = list->getOrder(i);
+            found = found || (type == CardType::BOMB && dynamic_cast<Bomb*>(order)) ||
+                (type == CardType::BLOCKADE && dynamic_cast<Blockade*>(order)) ||
+                (type == CardType::AIRLIFT && dynamic_cast<Airlift*>(order)) ||
+                (type == CardType::DIPLOMACY && dynamic_cast<Negotiate*>(order));
+        }
+        expect(found && player->getCardHand()->getSize() == 0 && cards.getDeck()->getSize() == deckSize + 1,
+               "card type " + std::to_string(static_cast<int>(type)) + " queues its order and returns card to deck");
+        expect(!player->issueOrder(), "a passed player remains finished for this turn");
+    }
+
+    std::cout << "\n=== Part 3: execution priority and round robin ===\n";
+    GameEngine execution;
+    execution.setupGame(map, {"Alice", "Bob"});
+    alice = execution.getPlayers()[0]; bob = execution.getPlayers()[1];
+    alice->setReinforcementPool(4); bob->setReinforcementPool(4);
+    Territory* a = alice->toDefend()[0]; Territory* a2 = alice->toDefend()[1];
+    Territory* b = bob->toDefend()[0]; Territory* b2 = bob->toDefend()[1];
+    // Put an Advance at the front deliberately: every Deploy must still execute first.
+    alice->getOrdersList()->addOrder(new Advance(alice, a, a2, 1));
+    bob->getOrdersList()->addOrder(new Advance(bob, b, b2, 1));
+    alice->getOrdersList()->addOrder(new Deploy(alice, a, 2));
+    bob->getOrdersList()->addOrder(new Deploy(bob, b, 2));
+    alice->getOrdersList()->addOrder(new Deploy(alice, a, 2));
+    bob->getOrdersList()->addOrder(new Deploy(bob, b, 2));
+    std::ostringstream executionLog;
+    auto* old = std::cout.rdbuf(executionLog.rdbuf());
+    execution.executeOrdersPhase();
+    std::cout.rdbuf(old);
+    std::cout << executionLog.str();
+    std::vector<std::string> executionNames;
+    std::istringstream lines(executionLog.str()); std::string line;
+    while (std::getline(lines, line)) {
+        if (line.starts_with("Executing Alice:")) executionNames.push_back("Alice");
+        if (line.starts_with("Executing Bob:")) executionNames.push_back("Bob");
+    }
+    expect(executionNames == std::vector<std::string>({"Alice", "Bob", "Alice", "Bob", "Alice", "Bob"}),
+           "execution takes one order per player per round");
+    expect(a->getArmyCount() == 3 && a2->getArmyCount() == 1 &&
+           b->getArmyCount() == 3 && b2->getArmyCount() == 1,
+           "all deploys execute before advances, even when advances were queued first");
+    expect(execution.getCurrentStateName() == "assign reinforcement", "execution returns to reinforcement state");
+    expect(alice->getOrdersList()->getSize() == 0 && bob->getOrdersList()->getSize() == 0, "all orders were removed");
+    execution.issueOrdersPhase();
+    expect(alice->getOrdersList()->getSize() > 0 && bob->getOrdersList()->getSize() > 0,
+           "round-robin issuing runs to player passes without a fixed round cap");
+
+    std::cout << "\n=== Part 3: conquest, elimination, victory and replay ===\n";
+    Map duel;
+    Continent* continent = duel.addContinent("Duel", 1);
+    Territory* left = duel.addTerritory(1, "Left", continent);
+    Territory* right = duel.addTerritory(2, "Right", continent);
+    left->addAdjacentTerritory(right); right->addAdjacentTerritory(left);
+    GameEngine game;
+    game.setupGame(duel, {"Winner", "Loser"});
+    Player* winner = game.getPlayers()[0]; Player* loser = game.getPlayers()[1];
+    // With zero defenders, the attack succeeds without randomness.
+    winner->getOrdersList()->addOrder(new Advance(winner, winner->toDefend()[0], loser->toDefend()[0], 1));
+    winner->setReinforcementPool(1);
+    winner->getOrdersList()->addOrder(new Deploy(winner, winner->toDefend()[0], 1));
+    game.executeOrdersPhase();
+    expect(game.getPlayers().size() == 1 && winner->getTerritoryList().size() == 2,
+           "successful attack removes the player that lost its final territory");
+    expect(game.getCurrentStateName() == "win", "complete map ownership enters win during execution");
+    expect(winner->getCardHand()->getSize() == 1, "conqueror receives one card for the turn");
+    expect(game.processCommand("replay") && game.getCurrentStateName() == "start" &&
+           game.getPlayers().empty() && game.getGameMap() == nullptr, "replay clears old game and returns to start");
+    game.setupGame(duel, {"A", "B"});
+    // Complete main loop with the regular combat rules.
+    game.getPlayers()[0]->setReinforcementPool(50);
+    game.mainGameLoop();
+    expect(game.getCurrentStateName() == "win", "mainGameLoop runs the three phases and stops on victory");
+    expect(game.processCommand("quit") && game.isFinished(), "quit from win ends the application");
+
+    std::cout << "\n=== Part 3: neutral territory prevents premature victory ===\n";
+    GameEngine neutralGame;
+    neutralGame.setupGame(duel, {"Blockader", "Survivor"});
+    Player* blockader = neutralGame.getPlayers()[0];
+    Player* remaining = neutralGame.getPlayers()[1];
+    Territory* neutral = blockader->toDefend()[0];
+    neutral->setArmyCount(4);
+    blockader->getOrdersList()->addOrder(new Blockade(blockader, neutral));
+    neutralGame.executeOrdersPhase();
+    expect(neutral->getOwner() == nullptr && neutral->getArmyCount() == 8,
+           "blockade preserves the map territory and doubles its armies under neutral ownership");
+    expect(neutralGame.getPlayers().size() == 1 && neutralGame.getCurrentStateName() != "win",
+           "one surviving player cannot win while a map territory remains neutral");
+    neutral->setArmyCount(0);
+    remaining->toDefend()[0]->setArmyCount(1);
+    remaining->getOrdersList()->addOrder(new Advance(remaining, remaining->toDefend()[0], neutral, 1));
+    neutralGame.executeOrdersPhase();
+    expect(neutralGame.getCurrentStateName() == "win" && neutral->getOwner() == remaining,
+           "capturing the final neutral territory triggers victory");
+
+    GameEngine deferred;
+    deferred.setupGame(duel, {"Issuer", "Other"});
+    Player* issuer = deferred.getPlayers()[0];
+    Card* bomb = new Card(CardType::BOMB);
+    issuer->getCardHand()->addCard(bomb);
+    Territory* ownTarget = issuer->toDefend()[0];
+    ownTarget->setArmyCount(6);
+    expect(playCardWithOrder(bomb, issuer, new Bomb(issuer, ownTarget)),
+           "a matching card can queue an order that is illegal in the current map state");
+    deferred.executeOrdersPhase();
+    expect(ownTarget->getArmyCount() == 6 && issuer->getOrdersList()->getSize() == 0,
+           "invalid order is rejected only at execution and leaves armies unchanged");
+
+    std::cout << "\n=== Part 3: map identity and copy lifetime ===\n";
+    GameEngine survivor;
+    {
+        GameEngine original;
+        original.setupGame(map, {"A", "B"});
+        original.reinforcementPhase();
+        original.issueOrdersPhase();
+        survivor = original;
+        GameEngine constructed(original);
+        expect(constructed.getPlayers()[0]->toDefend()[0] == constructed.getGameMap()->getTerritories()[0].get(),
+               "engine copy constructor binds players to its own map");
+    }
+    survivor.executeOrdersPhase();
+    bool canonicalOwnership = true;
+    for (Player* player : survivor.getPlayers()) for (Territory* owned : player->getTerritoryList()) {
+        bool matchesMap = false;
+        for (const auto& territory : survivor.getGameMap()->getTerritories())
+            if (territory.get() == owned && territory->getOwner() == player) matchesMap = true;
+        canonicalOwnership = canonicalOwnership && matchesMap;
+    }
+    expect(canonicalOwnership, "assigned engine executes copied orders after original engine destruction");
+    std::cout << (passed ? "PART 3 DRIVER PASSED\n" : "PART 3 DRIVER FAILED\n");
     return passed;
 }

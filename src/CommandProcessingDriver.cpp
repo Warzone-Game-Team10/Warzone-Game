@@ -566,6 +566,18 @@ void testFileFailures() {
     FileCommandProcessorAdapter adapterSource(fixture.file.string());
     FileCommandProcessorAdapter adapterDestination(fixture.file.string());
     adapterDestination.getCommand()->saveEffect("preserved");
+#ifdef _WIN32
+    // Windows blocks renaming these open streams. Report the OS-dependent
+    // failure-injection checks as skipped; still test independent assignment.
+    std::cout << "    SKIP: reopen-failure injection requires renaming an open file (unsupported on Windows).\n";
+    FileLineReader independent(source);
+    check(independent.readLineFromFile(line) && line == "first", "reader copy has its own cursor");
+    destination = source;
+    check(destination.readLineFromFile(line) && line == "first", "reader assignment restores source cursor");
+    adapterDestination = adapterSource;
+    check(adapterDestination.getCommandCount() == 0 &&
+          adapterDestination.getCommand()->getText() == "first", "adapter assignment copies source history and cursor");
+#else
     std::cout << "    Action: rename the open command file to moved.txt before copy/assignment attempts\n";
     std::filesystem::rename(fixture.file, fixture.directory / "moved.txt");
     threw = false;
@@ -589,6 +601,7 @@ void testFileFailures() {
     check(threw && adapterDestination.getCommandCount() == 1 &&
           adapterDestination.getSavedCommand(0)->getEffect() == "preserved" &&
           adapterDestination.getCommand()->getText() == "second", "failed adapter assignment preserves history and cursor");
+#endif
     threw = false;
     try {
         FileCommandProcessorAdapter directory(fixture.directory.string());
@@ -705,9 +718,15 @@ void testCommandCapture() {
 
 // runs command transitions with the given processor and prints the saved history
 void demonstrateCommands(CommandProcessor& processor) {
+    LogObserver::resetLog();
+    LogObserver logger;
     GameEngine engine;
+    engine.attach(&logger);
+    processor.attach(&logger);
     runCommandTransitions(engine, processor, std::cout);
     std::cout << processor;
+    // processor belongs to the caller and outlives this local logger.
+    processor.detach(&logger);
 }
 }
 
@@ -761,7 +780,7 @@ bool testCommandProcessing() {
             testFileAdapterCopies();
         }},
         {"", "File errors and failed assignment guarantees",
-                "Missing files, directory input, and reopening a renamed file throw descriptive errors.\n"
+                "Missing files, directory input, and reopening a renamed file (where the OS permits it) throw descriptive errors.\n"
                 "    If assignment fails because the source file was renamed, the destination keeps its saved commands and effects.\n"
                 "    Its reading position also stays unchanged: the next line read must still be \"second\".", testFileFailures}
     };

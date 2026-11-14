@@ -1,4 +1,4 @@
-﻿#include "Orders.h"
+#include "Orders.h"
 #include "Player.h"
 #include <iostream>
 #include <memory>
@@ -526,7 +526,14 @@ bool Blockade::validate() {
 void Blockade::execute() {
     if (validateExecution()) {
         Territory* actualTarget = findOwnedTerritory(issuer, target);
-        // The neutral player persists for the duration of the game process.
+        if (actualTarget && issuer->borrowsMapTerritories()) {
+            actualTarget->setArmyCount(actualTarget->getArmyCount() * 2);
+            issuer->releaseNeutralTerritory(actualTarget);
+            recordRealEffect("Blockaded " + actualTarget->getName() + "; transferred to neutral ownership.");
+            notify(this);
+            return;
+        }
+        // Standalone driver territories are owned by players, so retain their owner.
         static Player neutral("Neutral", nullptr, nullptr, {});
         if (actualTarget && issuer->transferTerritoryTo(neutral, actualTarget->getId())) {
             actualTarget->setArmyCount(actualTarget->getArmyCount() * 2);
@@ -725,12 +732,9 @@ OrdersList& OrdersList::operator=(const OrdersList& other) {
 // ADDING AN ORDER
 void OrdersList::addOrder(Order* newOrder) {
     if (newOrder != nullptr) {
-        list.push_back(newOrder); // this puts the order pointer onto the back of the queue
-        //for observer pattern, attach the observers to the new order
-        for (size_t i = 0; i < getObservers().size(); i++) {
-            newOrder->attach(getObservers()[i]);
-        }
-        notify(this);// notify observer
+        list.push_back(newOrder); // OrdersList now owns the order.
+        for (Observer* observer : getObservers()) newOrder->attach(observer);
+        notify(this);
     }
 }
 
@@ -901,3 +905,17 @@ Player* Negotiate::getIssuer() const {
     return issuer;
 }
 
+
+int OrdersList::getSize() const { return static_cast<int>(list.size()); }
+
+// Register observers for both future and already queued orders.
+void OrdersList::attach(Observer* observer) {
+    Subject::attach(observer);
+    for (Order* order : list) order->attach(observer);
+}
+
+// Remove the borrowed registration without deleting the observer.
+void OrdersList::detach(Observer* observer) {
+    Subject::detach(observer);
+    for (Order* order : list) order->detach(observer);
+}
