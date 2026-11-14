@@ -102,6 +102,11 @@ bool CommandProcessor::readCommand(std::string& line) {
 // saves a command in history and returns a pointer owned by the processor
 Command* CommandProcessor::saveCommand(const std::string& line) {
     history.push_back(std::make_unique<Command>(line));
+
+    //for observer pattern, attach the observers to the new command
+    for (size_t i = 0; i < getObservers().size(); i++) {
+        history.back()->attach(getObservers()[i]);
+    }
     notify(this);// notify observer
     return history.back().get();
 }

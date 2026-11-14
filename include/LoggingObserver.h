@@ -44,10 +44,10 @@ class Subject{
     void attach(Observer* observer);
     void detach(Observer* observer);
     void notify(ILoggable* loggable);// calls update() on every observer
-    const vector<Observer*>& getObservers() const; // handy to pass observers to child objects
+    const vector<Observer*>& getObservers() const; 
     friend ostream& operator<<(std::ostream& os, const Subject& s);
 private:
-    vector<Observer*>* observers;
+    vector<Observer*> *observers;
 };
 
 //=====LOGOBSERVER======

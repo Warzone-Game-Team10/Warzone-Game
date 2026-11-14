@@ -50,6 +50,9 @@ public:
     // cmd based startup phase: loadmap, validatemap, addplayer, gamestart
     void startupPhase();
 
+    // changes the current state and notifies the observers so the new state is logged
+    void transition(const std::string& newState);
+
     // applies a matching transition and returns false if none exists
     bool processCommand(const std::string& command);
 
