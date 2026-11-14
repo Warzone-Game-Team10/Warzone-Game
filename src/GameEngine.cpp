@@ -11,6 +11,8 @@
 #include <filesystem>
 #include <memory>
 #include <random>
+#include <unordered_map>
+#include <stdexcept>
 
 namespace {
 // directory that holds the map files the user can choose from
@@ -44,6 +46,8 @@ GameEngine& GameEngine::operator=(const GameEngine& other) {
         // free what we own (players first: their hands point to the deck), then deep copy
         for (size_t i = 0; i < players.size(); i++) delete players[i];
         players.clear();
+        for (Player* player : retiredPlayers) delete player;
+        retiredPlayers.clear();
         delete deck;
         delete gameMap;
 
@@ -57,28 +61,31 @@ GameEngine& GameEngine::operator=(const GameEngine& other) {
 // deep copies other's players, then points every territory of the copied map at the matching copied player
 // and every copied hand at this engine's own deck, runs after gameMap and deck have been copied
 void GameEngine::copyPlayersFrom(const GameEngine& other) {
-    std::map<const Player*, Player*> copiedPlayers; // original player -> its copy
-    for (size_t i = 0; i < other.players.size(); i++) {
-        Player* copy = new Player(*other.players[i]);
-        copy->getCardHand()->setDeck(deck); // the copied hand must not keep the original engine's deck
+    std::unordered_map<int, Territory*> territoryCopies;
+    if (gameMap) for (const auto& territory : gameMap->getTerritories())
+        territoryCopies[territory->getId()] = territory.get();
+    for (Player* original : other.players) {
+        Player* copy = new Player(*original);
+        copy->getCardHand()->setDeck(deck);
         players.push_back(copy);
-        copiedPlayers[other.players[i]] = copy;
-    }
-
-    if (gameMap == nullptr) {
-        return;
-    }
-    for (const auto& territory : gameMap->getTerritories()) {
-        const auto found = copiedPlayers.find(territory->getOwner());
-        if (found != copiedPlayers.end()) {
-            territory->setOwner(found->second);
+        if (gameMap) {
+            std::vector<Territory*> owned;
+            for (Territory* t : original->getTerritoryList()) owned.push_back(territoryCopies.at(t->getId()));
+            copy->getOrdersList()->rebindContext(copy, copy, territoryCopies);
+            copy->bindMapTerritories(owned);
         }
     }
+    // Rebind every issuer, diplomacy partner and territory across the complete graph.
+    for (Player* copy : players)
+        for (size_t i = 0; i < players.size(); ++i)
+            copy->getOrdersList()->rebindContext(other.players[i], players[i], territoryCopies);
+
 }
 
 // destructor
 GameEngine::~GameEngine() {
     for (size_t i = 0; i < players.size(); i++) delete players[i];
+    for (Player* player : retiredPlayers) delete player;
     delete deck;
     delete gameMap;
 }
@@ -138,7 +145,10 @@ bool GameEngine::processCommand(const std::string& command) {
     if (state != transitions.end()) {
         std::map<std::string, std::string>::const_iterator edge = state->second.find(command);
         if (edge != state->second.end()) {
-            currentState = edge->second;
+            const std::string next = edge->second;
+            if (command == "replay" || command == "quit") clearGame();
+            currentState = next;
+            notify(this);
             return true;
         }
     }
@@ -317,10 +327,10 @@ bool GameEngine::handleGameStart(Command& command) {
         territories.push_back(territory.get());
     }
     std::shuffle(territories.begin(), territories.end(), rng);
-    for (size_t i = 0; i < territories.size(); i++) {
-        Player* owner = players[i % players.size()];
-        owner->addTerritory(territories[i]);
-        territories[i]->setOwner(owner);
+    for (size_t p = 0; p < players.size(); ++p) {
+        std::vector<Territory*> owned;
+        for (size_t i = p; i < territories.size(); i += players.size()) owned.push_back(territories[i]);
+        players[p]->bindMapTerritories(owned);
     }
 
     // b) determine randomly the order of play of the players in the game
@@ -340,7 +350,175 @@ bool GameEngine::handleGameStart(Command& command) {
     return true;
 }
 
-// returns the engine's current state for logging.
+// returns the engine's current state for logging.ß
 string GameEngine::stringToLog( ) const{
     return "Game Engine: " + currentState;
 }
+
+
+
+
+
+// Part 3 gameplay. Player policy remains in Player.cpp.
+
+void GameEngine::clearGame() {
+    for (Player* player : players) player->resetTurnState();
+    for (Player* player : retiredPlayers) player->resetTurnState();
+    for (Player* player : players) delete player;
+    for (Player* player : retiredPlayers) delete player;
+    players.clear();
+    retiredPlayers.clear();
+    delete gameMap;
+    gameMap = nullptr;
+    delete deck;
+    deck = new Deck();
+}
+
+void GameEngine::setupGame(const Map& map, const std::vector<std::string>& names) {
+    if (names.empty() || map.getTerritories().empty())
+        throw std::invalid_argument("A gameplay setup needs a map and players.");
+    clearGame();
+    gameMap = new Map(map);
+    for (const std::string& name : names) {
+        Player* player = new Player();
+        player->setName(name);
+        player->getCardHand()->setDeck(deck);
+        players.push_back(player);
+    }
+    for (size_t p = 0; p < players.size(); ++p) {
+        std::vector<Territory*> owned;
+        for (size_t i = p; i < gameMap->getTerritories().size(); i += players.size())
+            owned.push_back(gameMap->getTerritories()[i].get());
+        players[p]->bindMapTerritories(owned);
+    }
+    currentState = "assign reinforcement";
+}
+
+void GameEngine::reinforcementPhase(std::vector<Player*>& active) {
+    currentState = "assign reinforcement";
+    notify(this);
+    for (Player* player : active) {
+        if (!player || player->getTerritoryList().empty()) continue;
+        int bonus = 0;
+        if (gameMap) for (const auto& continent : gameMap->getContinents()) {
+            bool containsTerritories = false, controlsAll = true;
+            for (const auto& territory : gameMap->getTerritories()) {
+                if (territory->getContinent() != continent.get()) continue;
+                containsTerritories = true;
+                if (territory->getOwner() != player) controlsAll = false;
+            }
+            if (containsTerritories && controlsAll) bonus += continent->getControlBonus();
+        }
+        int base = static_cast<int>(player->getTerritoryList().size()) / 3;
+        int armies = std::max(3, base + bonus);
+        player->addReinforcementArmies(armies);
+        std::cout << player->getName() << ": base " << base << ", continent bonus "
+                  << bonus << ", received " << armies << ", pool " << player->getReinforcementPool() << '\n';
+    }
+}
+
+void GameEngine::issueOrdersPhase(std::vector<Player*>& active) {
+    currentState = "issue orders";
+    notify(this);
+    std::vector<bool> passed(active.size(), false);
+    for (Player* player : active) if (player) player->beginIssuing();
+    bool unfinished = true;
+    while (unfinished) {
+        unfinished = false;
+        for (size_t i = 0; i < active.size(); ++i) {
+            if (passed[i]) continue;
+            Player* player = active[i];
+            if (!player || player->getTerritoryList().empty()) { passed[i] = true; continue; }
+            bool issued = player->issueOrder();
+            std::cout << player->getName() << (issued ? " issued one order\n" : " passed\n");
+            passed[i] = !issued;
+            if (issued) unfinished = true;
+        }
+    }
+}
+
+void GameEngine::removeEliminatedPlayers(std::vector<Player*>& active) {
+    for (auto it = active.begin(); it != active.end();) {
+        Player* player = *it;
+        if (player && !player->getTerritoryList().empty()) { ++it; continue; }
+        if (player) {
+            std::cout << player->getName() << " eliminated\n";
+            player->resetTurnState();
+            // Only the engine's own roster transfers ownership to the retired list.
+            if (&active == &players) retiredPlayers.push_back(player);
+        }
+        it = active.erase(it);
+    }
+}
+
+bool GameEngine::detectWinner(const std::vector<Player*>& active) {
+    if (!gameMap || gameMap->getTerritories().empty()) return false;
+    for (Player* player : active) {
+        if (!player) continue;
+        bool controlsAll = std::all_of(gameMap->getTerritories().begin(), gameMap->getTerritories().end(),
+            [player](const auto& t) { return t->getOwner() == player; });
+        if (controlsAll) {
+            currentState = "win";
+            std::cout << "VICTORY! Winner is " << player->getName() << "!\n";
+            notify(this);
+            return true;
+        }
+    }
+    return false;
+}
+
+void GameEngine::executeOrdersPhase(std::vector<Player*>& active) {
+    currentState = "execute orders";
+    notify(this);
+    // Snapshot the roster: elimination must not invalidate round-robin iteration.
+    const std::vector<Player*> executionOrder = active;
+    bool won = false;
+    for (int deployPass = 1; deployPass >= 0 && !won; --deployPass) {
+        bool executed = true;
+        while (executed && !won) {
+            executed = false;
+            for (Player* player : executionOrder) {
+                if (!player || player->getTerritoryList().empty()) continue;
+                OrdersList* list = player->getOrdersList();
+                int index = -1;
+                if (deployPass) {
+                    for (int i = 0; i < list->getSize(); ++i)
+                        if (dynamic_cast<Deploy*>(list->getOrder(i))) { index = i; break; }
+                } else if (list->getSize() > 0) index = 0;
+                if (index < 0) continue;
+                std::cout << "Executing " << player->getName() << ": " << *list->getOrder(index) << '\n';
+                list->getOrder(index)->execute();
+                list->remove(index);
+                executed = true;
+                removeEliminatedPlayers(active);
+                won = detectWinner(active);
+                if (won) break;
+            }
+        }
+    }
+    // Discard pending orders for eliminated players or once victory ends the game.
+    for (Player* player : executionOrder) {
+        if (!player) continue;
+        if (won || player->getTerritoryList().empty())
+            while (player->getOrdersList()->getSize()) player->getOrdersList()->remove(0);
+        player->awardConquestCard(*deck);
+        player->resetTurnState();
+    }
+    if (!won) { currentState = "assign reinforcement"; notify(this); }
+}
+
+void GameEngine::mainGameLoop(std::vector<Player*>& active) {
+    if (!gameMap) throw std::logic_error("Load and start a map before gameplay.");
+    while (!active.empty() && currentState != "win" && currentState != "end") {
+        removeEliminatedPlayers(active);
+        if (detectWinner(active) || active.empty()) break;
+        reinforcementPhase(active);
+        issueOrdersPhase(active);
+        executeOrdersPhase(active);
+    }
+}
+
+void GameEngine::mainGameLoop() { mainGameLoop(players); }
+void GameEngine::reinforcementPhase() { reinforcementPhase(players); }
+void GameEngine::issueOrdersPhase() { issueOrdersPhase(players); }
+void GameEngine::executeOrdersPhase() { executeOrdersPhase(players); }

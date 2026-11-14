@@ -13,6 +13,11 @@ using namespace std;
 
 class Player {
 private:
+    // Standalone players own copies; engine players borrow the map's territories.
+    bool ownsTerritoryObjects = true;
+    int committedDeployArmies = 0;
+    int issuingStep = 0;
+    bool finishedIssuing = false;
     string name;
     vector<Territory*> territoryList;
     Hand* cardHand;
@@ -66,6 +71,12 @@ public:
     bool isNegotiatingWith(const Player& other) const;
     void resetTurnState();
 
+    //------------ ASSIGNMENT 2 : PART 3 ------------------------------
+
+    void addReinforcementArmies(int armies);
+
+    void removeReinforcementArmies(int armies);
+
     //==========ASSIGNMENT FUNCTION==================
 
     // Return territories that are to be defended
@@ -76,6 +87,13 @@ public:
 
     // Create an Order object and add it to the player's orders list
     void issueOrder(string orderType);
+    // Issue one decision per call; false means this player has passed for the turn.
+    bool issueOrder();
+    void beginIssuing();
+    // Replace owned copies with borrowed map territories (engine integration only).
+    void bindMapTerritories(const vector<Territory*>& territories);
+    bool borrowsMapTerritories() const;
+    void releaseNeutralTerritory(Territory* territory);
 
     //==========GETTER FUNCTION==================
 

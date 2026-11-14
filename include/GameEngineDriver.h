@@ -16,3 +16,7 @@ void testGameStates();
 
 // runs and verifies the startup phase with a scripted six-player game
 bool testStartupPhase();
+
+
+// ( PART 3 ) demonstrates reinforcement, order issuing, execution, player elimination, and win conditions
+bool testMainGameLoop();
