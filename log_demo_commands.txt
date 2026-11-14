@@ -1,0 +1,4 @@
+loadmap file.map
+validatemap
+badcommand
+addplayer Alice

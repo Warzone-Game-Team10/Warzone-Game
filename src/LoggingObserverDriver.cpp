@@ -9,11 +9,13 @@
 #include <iostream>
 #include <sstream>
 #include <string>
+#include <vector>
+#include <cstdio>
 
 namespace {
     
-    //HELPER FUNCTIONS
-    // Reads the whole gamelog.txt file into a string.
+    //===========HELPER FUNCTIONS
+    // Reads the whole gamelog.txt file into a string
     std::string readLogFile() {
         //open the gamelog.txt file for reading
         std::ifstream in("gamelog.txt");
@@ -23,15 +25,32 @@ namespace {
         return buffer.str();
     }
 
-    // Checks that the log contains the given text and prints the result.
+    // Checks that the log contains the given text and prints the result
     bool logContains(const std::string& log, const std::string& expected, const std::string& label) {
         bool found = (log.find(expected) != std::string::npos);
         std::cout << "  " << label << ": " << (found ? "PASS" : "FAIL") << std::endl;
         return found;
     }
 
+    
+    // reads commands until the processor returns nullptr so its end of input
+    void runCommands(GameEngine& engine, CommandProcessor& processor) {
+        Command* command = processor.getCommand();
+
+        while (command != nullptr) {
+            std::cout << "  [" << engine.getCurrentStateName() << "] " << command->getText();
+
+            if (processor.validate(command, engine.getCurrentStateName())) {
+                engine.processCommand(*command);
+            }
+
+            std::cout << "   -> effect: " << command->getEffect() << std::endl;
+            command = processor.getCommand();
+        }
+    }
+
     //helper function to print the inheritance status of a class
-    void printInheritance(const std::string& className, Subject* subject, ILoggable* loggable) {
+    bool printInheritance(const std::string& className, Subject* subject, ILoggable* loggable) {
         //check if subject is from Subject and ILoggable, and if the two pointers point to the same object
         bool isSubject = (subject != nullptr);
         bool isLoggable = (dynamic_cast<ILoggable*>(subject) != nullptr);
@@ -42,11 +61,15 @@ namespace {
                 << " -> Subject: " << (isSubject ? "yes" : "NO")
                 << ", ILoggable: " << (isLoggable ? "yes" : "NO")
                 << ", same object: " << (sameObject ? "yes" : "NO") << std::endl;
+
+        return isSubject && isLoggable && sameObject;
     }
 
     //INHERITANCE TESTS
     // Tests that the five classes (Command, CommandProcessor, Deploy, OrdersList, GameEngine) inherit from Subject and ILoggable.
-    void testInheritance(){
+    bool testInheritance(){
+        bool passed = true;
+
         //create sample objects of each class to test inheritance
         Command* sampleCommand = new Command("loadmap sample.map");
         CommandProcessor* sampleProcessor = new CommandProcessor();
@@ -55,11 +78,11 @@ namespace {
         GameEngine* sampleEngine = new GameEngine();
 
         // Print the inheritance status of each class.
-        printInheritance("Command", sampleCommand, sampleCommand);
-        printInheritance("CommandProcessor", sampleProcessor, sampleProcessor);
-        printInheritance("Order (Deploy)", sampleOrder, sampleOrder);
-        printInheritance("OrdersList", sampleList, sampleList);
-        printInheritance("GameEngine", sampleEngine, sampleEngine);
+        if (!printInheritance("Command", sampleCommand, sampleCommand)) passed = false;
+        if (!printInheritance("CommandProcessor", sampleProcessor, sampleProcessor)) passed = false;
+        if (!printInheritance("Order (Deploy)", sampleOrder, sampleOrder)) passed = false;
+        if (!printInheritance("OrdersList", sampleList, sampleList)) passed = false;
+        if (!printInheritance("GameEngine", sampleEngine, sampleEngine)) passed = false;
 
         //prevent memory leaks by deleting the sample objects
         delete sampleCommand;
@@ -67,6 +90,8 @@ namespace {
         delete sampleOrder;
         delete sampleList;
         delete sampleEngine;
+
+        return passed;
     }
 
     // TESTING COPY CONSTRUCTORS AND ASSIGNMENT OPERATORS
@@ -122,6 +147,7 @@ namespace {
             std::string copyBefore = describe(*copy);
             std::string assignedBefore = describe(*assigned);
 
+            //change the original 
             original->detach(log);
 
             if (!printDeepCopyResult("Order (Deploy)", "logger detached",
@@ -146,7 +172,7 @@ namespace {
             std::string originalBefore = describe(*original);
             std::string copyBefore = describe(*copy);
             std::string assignedBefore = describe(*assigned);
-
+            //change the original
             original->detach(log);
             original->addOrder(new Deploy());
 
@@ -172,7 +198,7 @@ namespace {
             std::string originalBefore = describe(*original);
             std::string copyBefore = describe(*copy);
             std::string assignedBefore = describe(*assigned);
-
+            //change the original
             original->detach(log);
             original->saveEffect("Changed effect");
 
@@ -198,10 +224,10 @@ namespace {
             std::string originalBefore = describe(*original);
             std::string copyBefore = describe(*copy);
             std::string assignedBefore = describe(*assigned);
-
+            //change the original
             original->detach(log);
 
-            if (!printDeepCopyResult("CommandProcessor", "logger detached, one command saved",
+            if (!printDeepCopyResult("CommandProcessor", "logger detached",
                                     originalBefore, copyBefore, assignedBefore,
                                     describe(*original), describe(*copy), describe(*assigned))) {
                 passed = false;
@@ -223,7 +249,7 @@ namespace {
             std::string originalBefore = describe(*original);
             std::string copyBefore = describe(*copy);
             std::string assignedBefore = describe(*assigned);
-
+            //change the original
             original->detach(log);
             original->processCommand(std::string("loadmap"));
 
@@ -267,6 +293,7 @@ namespace {
         return passed;
     }
 
+    // test to see the gamelof txt file is being written to correctly by the LogObserver
     bool testGameLog(LogObserver* logObserver) {
         bool passed = true;
 
@@ -281,7 +308,7 @@ namespace {
             "addplayer Alice\n"
             "addplayer Bob\n"
             "gamestart\n"             // startup ends, the game loop takes over
-            "quit\n");                // read after the loop, valid in state win
+            "quit\n");                
 
         GameEngine engine;
         CommandProcessor processor(script);
@@ -326,35 +353,113 @@ namespace {
         return passed;
     }
 
+
+    // demo that Commands entered on the console AND commands read from a file are written to the log,
+    bool testConsoleAndFileCommands(LogObserver* logObserver) {
+        bool passed = true;
+
+        // ---------------- console ----------------
+        // std::cin is replaced by a script, so the CommandProcessor that reads the console
+        // receives these lines as if somebody typed them.
+        std::cout << "  Console input (the first command is invalid in state start):" << std::endl;
+
+        std::istringstream typed("gamestart\nloadmap console.map\nvalidatemap\n");
+        std::streambuf* realConsole = std::cin.rdbuf(typed.rdbuf());
+
+        GameEngine* consoleEngine = new GameEngine();
+        CommandProcessor* consoleProcessor = new CommandProcessor();      // reads std::cin
+        consoleEngine->attach(logObserver);
+        consoleProcessor->attach(logObserver);
+
+        runCommands(*consoleEngine, *consoleProcessor);
+
+        std::cin.rdbuf(realConsole);       // give the real console back
+        std::cin.clear();                  // the script reached its end: clear the eof flag
+
+        delete consoleProcessor;
+        delete consoleEngine;
+
+        // ---------------- file ----------------
+        // The driver writes a small command file, then reads it with FileCommandProcessorAdapter.
+        std::cout << "\n  File input (the third command is unknown):" << std::endl;
+
+        const std::string commandFile = "log_demo_commands.txt";
+        {
+            std::ofstream out(commandFile);
+            out << "loadmap file.map\nvalidatemap\nbadcommand\naddplayer Alice\n";
+        }
+
+        GameEngine* fileEngine = new GameEngine();
+        FileCommandProcessorAdapter* fileProcessor = new FileCommandProcessorAdapter(commandFile);
+        fileEngine->attach(logObserver);
+        fileProcessor->attach(logObserver);
+
+        runCommands(*fileEngine, *fileProcessor);
+
+        delete fileProcessor;
+        delete fileEngine;
+        
+
+        // ---------------- check the log ----------------
+        std::cout << "\n  Entries found in gamelog.txt:" << std::endl;
+        const std::string log = readLogFile();
+
+        // commands written to the log
+        if (!logContains(log, "SaveCommand(): gamestart", "console: command written")) passed = false;
+        if (!logContains(log, "SaveCommand(): loadmap console.map", "console: command written")) passed = false;
+        if (!logContains(log, "SaveCommand(): loadmap file.map", "file: command written")) passed = false;
+        if (!logContains(log, "SaveCommand(): badcommand", "file: command written")) passed = false;
+
+        // effects written to the log (rejected and accepted)
+        if (!logContains(log, "SaveEffect: Command 'gamestart' is not allowed", "console: rejected effect written")) passed = false;
+        if (!logContains(log, "SaveEffect: Transition: loadmap [console.map]", "console: accepted effect written")) passed = false;
+        if (!logContains(log, "SaveEffect: Unknown command 'badcommand'", "file: rejected effect written")) passed = false;
+        if (!logContains(log, "SaveEffect: Transition: loadmap [file.map]", "file: accepted effect written")) passed = false;
+
+        return passed;
+    }
+   
+
 }
 
 bool testLoggingObserver() {
 
-    // Only ONE LogObserver: its constructor empties gamelog.txt.
+    bool passed = true;
+
     LogObserver* logObserver = new LogObserver();
     
     // ------------------------------------------------------------
     // TEST 1: all five classes are a Subject and an ILoggable
     // ------------------------------------------------------------
     std::cout << "\nTEST 1: Inheritance from Subject and ILoggable" << std::endl;
-    testInheritance();
+    if (!testInheritance()) {
+        passed = false;
+    }
     
     // ------------------------------------------------------------
     // TEST 2: copy constructor and assignment operator work for all five classes
     // ------------------------------------------------------------
     std::cout << "\nTEST 2: Copy constructor and assignment operator" << std::endl;
-    testCopyAndAssignment(logObserver);
-    
-
+    if (!testCopyAndAssignment(logObserver)) {
+        passed = false;
+    }
+  
     // ------------------------------------------------------------
     // TEST 3: commands, their effects and state changes are logged
     // ------------------------------------------------------------
     std::cout << "\nTEST 3: Commands, effects and game state changes" << std::endl;
-    testGameLog(logObserver);
-    
+    if (!testGameLog(logObserver)) {
+        passed = false;
+    }
 
-
-
+    // ------------------------------------------------------------
+    // TEST 4: commands from the console and from a file are logged with their effect
+    // (rubric 5.2.11)
+    // ------------------------------------------------------------
+    std::cout << "\nTEST 4: Commands from the console and from a file" << std::endl;
+    if (!testConsoleAndFileCommands(logObserver)) {
+        passed = false;
+    }
    
 
 
@@ -363,25 +468,39 @@ bool testLoggingObserver() {
     logObserver = nullptr;
 
 
+    // final summary of the test results
+    std::cout << "\nLOGGING OBSERVER TEST RESULTS: " << std::endl;
+
     //to make function return if the tess pass or not
     const std::string log = readLogFile();
 
+    //expected entries in the log file
     const std::string expectedEntries[] = {
         "SaveCommand(): gamestart",
         "SaveCommand(): loadmap canada.map",
         "SaveCommand(): validatemap",
         "SaveCommand(): addplayer Alice",
         "SaveCommand(): addplayer Bob",
-        "SaveCommand(): wrongCommand"
+        "SaveCommand(): wrongCommand",
+        "SaveEffect: Command 'gamestart' is not allowed",
+        "SaveEffect: Unknown command 'wrongCommand'",
+        "SaveEffect: Transition: loadmap [canada.map]",
+        "AddOrder()",
+        "Order Executed:",
+        "Game Engine Transition State: map loaded"
     };
 
-    bool passed = true;
-
+  
+    //check if all expected entries are in the log file
     for (const std::string& entry : expectedEntries) {
         if (!logContains(log, entry, entry)) {
             passed = false;
         }
     }
+
+
+    std::cout << "\nLOGGING OBSERVER DRIVER: " << (passed ? "PASS" : "FAIL") << std::endl;
+
 
     return passed;
 
