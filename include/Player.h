@@ -8,8 +8,11 @@
 #include "Cards.h"
 #include "Orders.h"
 #include "Map.h"
+#include "PlayerStrategies.h"
 
 using namespace std;
+
+class PlayerStrategy; // Forward declaration to avoid circular dependency
 
 class Player {
 private:
@@ -28,6 +31,9 @@ private:
     bool conqueredThisTurn = false;
     bool conquestCardAwardedThisTurn = false;
     std::vector<Player*> negotiatedPlayers;
+
+    // The strategy that makes this player's decisions. Owned by the player (deleted in the destructor).
+    PlayerStrategy* strategy;
 
     // Build the copies for the player that will keep them.
     Player(const Player& original, Player* destination);
@@ -79,6 +85,11 @@ public:
 
     //==========ASSIGNMENT FUNCTION==================
 
+    //stragery pattern
+    void issueOrder(PlayerStrategy* strategy);
+    vector<Territory*> toAttack(PlayerStrategy* strategy);
+    vector<Territory*> toDefend(PlayerStrategy* strategy);
+
     // Return territories that are to be defended
     vector<Territory*> toDefend();
 
@@ -115,6 +126,9 @@ public:
     // NEW: Reinforcement pool management
     void setReinforcementPool(int armies);
     bool useReinforcements(int armies);
+
+    // Gives the player a new strategy. The player takes ownership of newStrategy and deletes the old one.
+    void setStrategy(PlayerStrategy* newStrategy);
 
     //=====To String========
 

@@ -12,6 +12,7 @@
 #include "Orders.h"
 #include "Map.h"
 #include "CardOrderIntegration.h"
+#include "PlayerStrategies.h"
 
 
 using namespace std;
@@ -221,6 +222,20 @@ bool Player::ownsTerritory(Territory* territory) {
     }
     return false;
 }
+
+
+//======stragery pattern
+void Player::issueOrder(PlayerStrategy* strategy){
+    this->strategy = strategy;
+}
+vector<Territory*> Player::toAttack(PlayerStrategy* strategy){
+    this->strategy = strategy;
+}
+vector<Territory*> Player::toDefend(PlayerStrategy* strategy){
+    this->strategy = strategy;
+}
+
+
 
 //return a list of territories that player OWNs that are to be defended
 vector<Territory*> Player::toDefend(){
@@ -459,6 +474,27 @@ void Player::setOrdersList(OrdersList* newOrders){
     ordersList = new OrdersList(*newOrders);     // deep copy FIRST (a separate list)
     delete oldOrders;                            // then free the old one
 };                
+
+
+
+// Gives the player a new strategy and takes ownership of it. The previous strategy is deleted.
+void Player::setStrategy(PlayerStrategy* newStrategy) {
+    if (newStrategy == strategy) {
+        return;
+    }
+
+    PlayerStrategy* oldStrategy = strategy;
+
+    //Deep copy the new strategy if it is not null
+    if (newStrategy != nullptr) {
+        this->strategy = newStrategy->clone();
+    } else {
+        this->strategy = nullptr;
+    }
+
+    delete oldStrategy;
+}
+
 
 //======Like the toString
 ostream& operator<<(ostream& out, const Player& p) {
