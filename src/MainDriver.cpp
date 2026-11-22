@@ -2,6 +2,7 @@
 #include "MapDriver.h"
 #include "CardsDriver.h"
 #include "PlayerDriver.h"
+#include "PlayerStrategyDriver.h"
 #include "OrdersDriver.h"
 #include "GameEngineDriver.h"
 #include "GameEngine.h"
@@ -20,11 +21,11 @@ void printUsage(std::ostream& out, const char* program) {
     out << "Usage: " << program << " -console\n"
         << "       " << program << " -startup\n"
         << "       " << program << " -file <filename>\n"
-        << "       " << program << " [map|player|orders|cards|startup|gameplay|all] [maps-directory]\n"
+        << "       " << program << " [map|player|playerstrategy|orders|cards|startup|gameplay|all] [maps-directory]\n"
         << "       " << program << " [gameengine|commands]\n"
         << "       " << program << " --help\n"
         << "Defaults: all tests, maps/ directory\n"
-        << "Available components: map, player, orders, cards, startup, gameplay, gameengine, commands\n"
+        << "Available components: map, player, playerstrategy, orders, cards, startup, gameplay, gameengine, commands\n"
         << "commands: run command-processing tests.\n"
         << "startup: run the scripted startup-phase demonstration.\n"
         << "all: run all tests.\n"
@@ -94,7 +95,8 @@ int main(int argc, char* argv[]) {
             command == "map" || command == "player" || command == "orders" || command == "all";
         const bool knownComponent =
             acceptsMapDirectory || command == "cards" || command == "startup" || command == "gameplay" ||
-            command == "gameengine" || command == "commands" || command == "logging" || command == "issue28";
+            command == "gameengine" || command == "commands" || command == "logging" || command == "issue28" ||
+            command == "playerstrategy";
         if (!knownComponent || argc > 3 ||
             (argc == 3 && (!acceptsMapDirectory || std::string_view(argv[2]).starts_with("-")))) {
             return usageError(argv[0], "Invalid driver or launch arguments.");
@@ -110,6 +112,10 @@ int main(int argc, char* argv[]) {
 
         if (command == "issue28") {
             passed = testIssue28();
+        }
+        if (command == "playerstrategy" || command == "all") {
+            std::cout << "-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-= Part 1: Player Strategy =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=\n";
+            passed = testPlayerStrategy();
         }
 
         // Part 1: Map

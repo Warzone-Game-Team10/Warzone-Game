@@ -1,9 +1,9 @@
 CARD_SMOKE_SRCS = $(filter-out src/MainDriver.cpp,$(wildcard src/*.cpp))
 
-output: MainDriver.o MapDriver.o Map.o CardsDriver.o Cards.o Player.o PlayerDriver.o Orders.o OrdersDriver.o GameEngineDriver.o GameEngine.o CommandProcessing.o CommandProcessingDriver.o LoggingObserver.o LoggingObserverDriver.o Issue28Driver.o
-	g++ MainDriver.o MapDriver.o Map.o CardsDriver.o Cards.o Player.o PlayerDriver.o Orders.o OrdersDriver.o GameEngineDriver.o GameEngine.o CommandProcessing.o CommandProcessingDriver.o LoggingObserver.o LoggingObserverDriver.o Issue28Driver.o -o warzone-tests.exe
+output: MainDriver.o MapDriver.o Map.o CardsDriver.o Cards.o Player.o PlayerDriver.o PlayerStrategies.o PlayerStrategyDriver.o Orders.o OrdersDriver.o GameEngineDriver.o GameEngine.o CommandProcessing.o CommandProcessingDriver.o LoggingObserver.o LoggingObserverDriver.o Issue28Driver.o
+	g++ MainDriver.o MapDriver.o Map.o CardsDriver.o Cards.o Player.o PlayerDriver.o PlayerStrategies.o PlayerStrategyDriver.o Orders.o OrdersDriver.o GameEngineDriver.o GameEngine.o CommandProcessing.o CommandProcessingDriver.o LoggingObserver.o LoggingObserverDriver.o Issue28Driver.o -o warzone-tests.exe
 
-MainDriver.o: src/MainDriver.cpp include/MapDriver.h include/CardsDriver.h include/PlayerDriver.h include/OrdersDriver.h include/GameEngineDriver.h include/CommandProcessingDriver.h
+MainDriver.o: src/MainDriver.cpp include/MapDriver.h include/CardsDriver.h include/PlayerDriver.h include/PlayerStrategyDriver.h include/OrdersDriver.h include/GameEngineDriver.h include/CommandProcessingDriver.h
 	g++ -std=c++20 -Iinclude -c src/MainDriver.cpp -o MainDriver.o
 
 MapDriver.o: src/MapDriver.cpp include/Map.h
@@ -18,11 +18,17 @@ CardsDriver.o: src/CardsDriver.cpp include/Cards.h
 Cards.o: src/Cards.cpp include/Cards.h
 	g++ -std=c++20 -Iinclude -c src/Cards.cpp -o Cards.o
 
-Player.o: src/Player.cpp include/Player.h
+Player.o: src/Player.cpp include/Player.h include/PlayerStrategies.h
 	g++ -std=c++20 -Iinclude -c src/Player.cpp -o Player.o
 
 PlayerDriver.o: src/PlayerDriver.cpp include/Player.h
 	g++ -std=c++20 -Iinclude -c src/PlayerDriver.cpp -o PlayerDriver.o
+
+PlayerStrategies.o: src/PlayerStrategies.cpp include/PlayerStrategies.h include/Player.h
+	g++ -std=c++20 -Iinclude -c src/PlayerStrategies.cpp -o PlayerStrategies.o
+
+PlayerStrategyDriver.o: src/PlayerStrategyDriver.cpp include/PlayerStrategyDriver.h include/Player.h include/PlayerStrategies.h
+	g++ -std=c++20 -Iinclude -c src/PlayerStrategyDriver.cpp -o PlayerStrategyDriver.o
 
 Orders.o: src/Orders.cpp include/Orders.h
 	g++ -std=c++20 -Iinclude -c src/Orders.cpp -o Orders.o
