@@ -631,13 +631,13 @@ Order* HumanPlayerStrategy::buildCardOrder(Card* card, int& movedSourceId, int& 
         return new Airlift(player, source, target, armyCount);
     }
 
-    // Card DIPLOMACY: ask the user which enemy player to negotiate with. If there are no neighbouring enemy players, inform the user and return nullptr.
+    // Card DIPLOMACY: ask the user which opponent to negotiate with. If there are no opponents, inform the user and return nullptr.
     if (card->getType() == CardType::DIPLOMACY) {
         // Collect each enemy player 
         std::vector<Player*> opponents = findAllOpponents();
 
         if (opponents.empty()) {
-            std::cout << "There is no neighbouring player to negotiate with.\n";
+            std::cout << "There is no opponent to negotiate with.\n";
             return nullptr;
         }
 
