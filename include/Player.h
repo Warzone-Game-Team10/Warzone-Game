@@ -123,7 +123,7 @@ public:
     void setReinforcementPool(int armies);
     bool useReinforcements(int armies);
 
-    // Gives the player a new strategy. The player takes ownership of newStrategy and deletes the old one.
+    // Gives the player a new strategy. The player  retains ownership of newStrategy and deletes the old one.
     void setStrategy(PlayerStrategy* newStrategy);
 
     //=====To String========

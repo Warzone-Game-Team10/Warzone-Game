@@ -162,6 +162,71 @@ std::vector<Territory*> PlayerStrategy::findOwnedTerritories() const {
     return owned;
 }
 
+// Finds all opponents of the player, including those that are not adjacent.
+std::vector<Player*> PlayerStrategy::findAllOpponents() const {
+    std::vector<Player*> opponents;
+
+    if (player == nullptr) {
+        return opponents;
+    }
+
+    // Territories still to examine. The list grows while it is walked, so it uses an index loop.
+    std::vector<Territory*> toVisit = player->getTerritoryList();
+    std::vector<int> visitedIds;
+    // get list of ids of territories already in toVisit so we don't add duplicates
+    for (size_t i = 0; i < toVisit.size(); i++) {
+        visitedIds.push_back(toVisit[i]->getId());
+    }
+
+    // loops until all territories reachable from the player's territories have been examined
+    for (size_t i = 0; i < toVisit.size(); i++) {
+        const std::vector<Territory*>& neighbours = toVisit[i]->getAdjacentTerritories();
+
+        // loops through the neighbours of the current territory
+        for (size_t j = 0; j < neighbours.size(); j++) {
+            Territory* neighbour = neighbours[j];
+
+            if (neighbour == nullptr) {
+                continue;
+            }
+
+            // skip if this neighbour has already been visited
+            bool alreadyVisited = false;
+            for (size_t k = 0; k < visitedIds.size(); k++) {
+                if (visitedIds[k] == neighbour->getId()) {
+                    alreadyVisited = true;
+                }
+            }
+            if (alreadyVisited) {
+                continue;
+            }
+
+            // mark this neighbour as visited and add it to the list of territories to examine
+            visitedIds.push_back(neighbour->getId());
+            toVisit.push_back(neighbour);
+
+            // if the neighbour is owned by an opponent, add that opponent to the list of opponents
+            Player* owner = neighbour->getOwner();
+            if (owner == nullptr || owner == player) {
+                continue;
+            }
+
+            // check if this opponent is already in the list of opponents
+            bool alreadyListed = false;
+            for (size_t k = 0; k < opponents.size(); k++) {
+                if (opponents[k] == owner) {
+                    alreadyListed = true;
+                }
+            }
+            if (!alreadyListed) {
+                opponents.push_back(owner);
+            }
+        }
+    }
+
+    return opponents;
+}
+
 // Polymorphic stream insertion: works through a PlayerStrategy reference or pointer.
 std::ostream& operator<<(std::ostream& out, const PlayerStrategy& strategy) {
     out << "Player Strategy abstract base class";
@@ -233,11 +298,6 @@ bool HumanPlayerStrategy::issueOrder() {
     std::cout << "\n===== " << player->getName() << " (Human): issue an order =====\n";
     std::cout << "Your territories:\n";
     printTerritoryChoices(toDefend());
-    // for (size_t i = 0; i < owned.size(); i++) {
-    //     std::cout << "  " << (i + 1) << ") " << owned[i]->getName()
-    //             << " (armies: " << owned[i]->getArmyCount()
-    //             << ", available to move: " << getArmiesAvailableToMove(owned[i]) << ")\n";
-    // }
     std::cout << "Territories you could attack:\n";
     printTerritoryChoices(toAttack());
 
@@ -573,23 +633,8 @@ Order* HumanPlayerStrategy::buildCardOrder(Card* card, int& movedSourceId, int& 
 
     // Card DIPLOMACY: ask the user which enemy player to negotiate with. If there are no neighbouring enemy players, inform the user and return nullptr.
     if (card->getType() == CardType::DIPLOMACY) {
-        // Collect each distinct enemy player that owns a territory next to ours.
-        std::vector<Player*> opponents;
-        for (size_t i = 0; i < attack.size(); i++) {
-            Player* owner = attack[i]->getOwner();
-            if (owner == nullptr || owner == player) {
-                continue;
-            }
-            bool alreadyListed = false;
-            for (size_t j = 0; j < opponents.size(); j++) {
-                if (opponents[j] == owner) {
-                    alreadyListed = true;
-                }
-            }
-            if (!alreadyListed) {
-                opponents.push_back(owner);
-            }
-        }
+        // Collect each enemy player 
+        std::vector<Player*> opponents = findAllOpponents();
 
         if (opponents.empty()) {
             std::cout << "There is no neighbouring player to negotiate with.\n";

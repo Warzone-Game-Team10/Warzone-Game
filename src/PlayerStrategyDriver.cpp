@@ -583,9 +583,10 @@ bool testCheaterPlayerStrategy(const std::string& mapPath) {
 
 bool testPlayerStrategy() {
     const std::string mapPath = "maps/nyc/NYC.map";
-    testPlayerStrategyClone();
-    testHumanPlayerStrategy(mapPath);
-    testCheaterPlayerStrategy(mapPath);
+    bool clonePassed = testPlayerStrategyClone();
+    bool humanPassed = testHumanPlayerStrategy(mapPath);
+    bool cheaterPassed = testCheaterPlayerStrategy(mapPath);
 
-    return true;
+    return clonePassed && humanPassed && cheaterPassed;
+   
 }

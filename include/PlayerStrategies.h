@@ -35,7 +35,8 @@ class PlayerStrategy {
         vector<Territory*> findAdjacentEnemyTerritories() const;
         // The territories owned by the player.
         vector<Territory*> findOwnedTerritories() const;
-
+        std::vector<Player*> findAllOpponents() const;
+        
         // Pure virtual functions that must be implemented by derived classes
         virtual bool issueOrder() = 0;
         virtual vector<Territory*> toAttack() = 0;
@@ -66,7 +67,7 @@ class HumanPlayerStrategy : public PlayerStrategy {
         bool issueCardOrder();
         Order* buildCardOrder(Card* card, int& movedSourceId, int& movedArmies);
         int getArmiesAvailableToMove(Territory* territory) const;
-
+       
 
         bool issueOrder() override;
         vector<Territory*> toAttack() override;
