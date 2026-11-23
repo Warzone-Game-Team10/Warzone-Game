@@ -122,7 +122,7 @@ Player& Player::operator=(const Player& other) {
         name.swap(replacement.name);
         territoryList.swap(replacement.territoryList);
         std::swap(ownsTerritoryObjects, replacement.ownsTerritoryObjects);
-
+        std::swap(strategy, replacement.strategy);
         std::swap(cardHand, replacement.cardHand);
         std::swap(ordersList, replacement.ordersList);
         std::swap(reinforcementPool, replacement.reinforcementPool);

@@ -66,6 +66,8 @@ namespace {
         }
         return found->second;
     }
+
+    
 }
 
 
@@ -231,6 +233,11 @@ bool HumanPlayerStrategy::issueOrder() {
     std::cout << "\n===== " << player->getName() << " (Human): issue an order =====\n";
     std::cout << "Your territories:\n";
     printTerritoryChoices(toDefend());
+    // for (size_t i = 0; i < owned.size(); i++) {
+    //     std::cout << "  " << (i + 1) << ") " << owned[i]->getName()
+    //             << " (armies: " << owned[i]->getArmyCount()
+    //             << ", available to move: " << getArmiesAvailableToMove(owned[i]) << ")\n";
+    // }
     std::cout << "Territories you could attack:\n";
     printTerritoryChoices(toAttack());
 
@@ -403,6 +410,12 @@ bool HumanPlayerStrategy::issueAdvanceOrder() {
 
     // Create a new Advance order and add it to the player's orders list. Update the advancedThisTurn map to reflect the new advance.
     player->getOrdersList()->addOrder(new Advance(player, source, target, armyCount));
+
+    // Inform the user that the order has been queued and will be carried out in the execute phase.
+    std::cout << "Order queued: advance " << armyCount << " armies from "
+          << source->getName() << " to " << target->getName()
+          << " (carried out in the execute phase).\n";
+
     advancedThisTurn[source->getId()] += armyCount;
     return true;
 }
@@ -649,10 +662,13 @@ bool CheaterPlayerStrategy::issueOrder() {
     std::vector<Territory*> targets = toAttack();
     bool conqueredSomething = false;
 
+    // For each target territory, if it has an owner, transfer it to the cheater player. If it has no owner, simply add it to the cheater player's territories.
     for (size_t i = 0; i < targets.size(); i++) {
+        // Get the target territory and its current owner
         Territory* target = targets[i];
         Player* previousOwner = target->getOwner();
 
+        // If the target territory is already owned by the cheater player, skip it.
         if (previousOwner == player) {
             continue;
         }

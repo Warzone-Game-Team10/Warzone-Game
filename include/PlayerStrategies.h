@@ -29,7 +29,7 @@ class PlayerStrategy {
         virtual ~PlayerStrategy();
         
         //helpers
-        void beginIssuing();
+        virtual void beginIssuing();
         void setPlayer(Player* player);
         // The territories that touch one of the player's territories but are not the player's own.
         vector<Territory*> findAdjacentEnemyTerritories() const;
@@ -59,7 +59,7 @@ class HumanPlayerStrategy : public PlayerStrategy {
         ~HumanPlayerStrategy();
 
         //helper functions
-        void beginIssuing();
+        virtual void beginIssuing() override;
         bool issueDeployOrder(int armiesLeftToDeploy);
         bool issueMenuOrder();
         bool issueAdvanceOrder();
