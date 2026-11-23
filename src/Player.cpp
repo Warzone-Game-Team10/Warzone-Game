@@ -12,6 +12,7 @@
 #include "Orders.h"
 #include "Map.h"
 #include "CardOrderIntegration.h"
+#include "PlayerStrategies.h"
 
 
 using namespace std;
@@ -19,7 +20,10 @@ using namespace std;
 //==========BASIC FUNCTION==================
 //constructor
 Player::Player()
-    : name("Unnamed"), territoryList(), cardHand(new Hand(nullptr)), ordersList(new OrdersList()) {}
+    : name("Unnamed"), territoryList(), cardHand(new Hand(nullptr)), ordersList(new OrdersList()) {
+        //default to human player strategy
+        strategy = new HumanPlayerStrategy(this);
+}
 
  Player::Player(string playerName, Hand* cardHand, OrdersList* ordersList, vector<Territory*> territoryList)
  : name(playerName), territoryList(), cardHand(nullptr), ordersList(nullptr) {
@@ -45,6 +49,9 @@ Player::Player()
     for (int i = 0; i < count; i++) {
         addTerritory(territoryList[i]);
     }
+
+    //default to human player strategy
+    strategy = new HumanPlayerStrategy(this);
     
 } 
 
@@ -56,9 +63,8 @@ Player::Player(const Player& original, Player* destination)
     : name(original.name), territoryList(), cardHand(nullptr), ordersList(nullptr),
       reinforcementPool(original.reinforcementPool), conqueredThisTurn(original.conqueredThisTurn),
       conquestCardAwardedThisTurn(original.conquestCardAwardedThisTurn) {
-    committedDeployArmies = original.committedDeployArmies;
-    issuingStep = original.issuingStep;
-    finishedIssuing = original.finishedIssuing;
+
+    
     // These temporary copies clean themselves up if any step fails.
     // Store them here only after the whole copy is ready.
     auto handCopy = std::make_unique<Hand>(*original.cardHand);
@@ -91,8 +97,18 @@ Player::Player(const Player& original, Player* destination)
     }
     ordersCopy->rebindContext(&original, destination, territoryCopies);
 
+    // Deep copy of the strategy
+    // clone() points the copied strategy at the player that keeps the copy
+    PlayerStrategy* strategyCopy = nullptr;
+    if (original.strategy != nullptr) {
+        strategyCopy = original.strategy->clone();
+        strategyCopy->setPlayer(destination);
+    }
+
+
     cardHand = handCopy.release();
     ordersList = ordersCopy.release();
+    strategy = strategyCopy;
     for (std::size_t index = 0; index < ownedCopies.size(); ++index) {
         territoryList[index] = ownedCopies[index].release();
     }
@@ -106,9 +122,7 @@ Player& Player::operator=(const Player& other) {
         name.swap(replacement.name);
         territoryList.swap(replacement.territoryList);
         std::swap(ownsTerritoryObjects, replacement.ownsTerritoryObjects);
-        std::swap(committedDeployArmies, replacement.committedDeployArmies);
-        std::swap(issuingStep, replacement.issuingStep);
-        std::swap(finishedIssuing, replacement.finishedIssuing);
+        std::swap(strategy, replacement.strategy);
         std::swap(cardHand, replacement.cardHand);
         std::swap(ordersList, replacement.ordersList);
         std::swap(reinforcementPool, replacement.reinforcementPool);
@@ -125,6 +139,8 @@ Player::~Player(){
     resetTurnState();
     delete cardHand;
     delete ordersList;
+    delete strategy;
+    strategy = nullptr;
     deleteAllTerritories();
 }
 
@@ -222,54 +238,44 @@ bool Player::ownsTerritory(Territory* territory) {
     return false;
 }
 
-//return a list of territories that player OWNs that are to be defended
-vector<Territory*> Player::toDefend(){
-    return territoryList;
-}
 
-//returns a list of territories that are to be attacked.
-vector<Territory*> Player::toAttack(){
+//======stragery pattern
+// ====== Strategy pattern: the Player contains no decision logic ======
 
-    //store list of territories to attack
-    std::vector<Territory*> result;
- 
-    int myCount = territoryList.size();
-    for (int i = 0; i < myCount; i++) {
-        //Look at each territory I own and see its neighbours with getAdjacentTerritories() from map file.
-        std::vector<Territory*> neighbours = territoryList[i]->getAdjacentTerritories();
- 
-        //check if the neighbours are not repeasting or part of the territory list already
-        int neighbourCount = neighbours.size();
-        for (int j = 0; j < neighbourCount; j++) {
-            Territory* candidate = neighbours[j];
- 
-            // ignore a null neighbour.
-            if (candidate == nullptr) {
-                continue;
-            }
- 
-            // Check if player already own the territory is yes then skip
-            if (ownsTerritory(candidate)) {
-                continue;   
-            }
- 
-            // check if territory is already in the list of results. if yes then don't add else add to the list result
-            bool alreadyListed = false;
-            int resultCount = result.size();
-            for (int k = 0; k < resultCount; k++) {
-                if (result[k]->getId() == candidate->getId()) {
-                    alreadyListed = true;
-                }
-            }
- 
-            if (alreadyListed == false) {
-                result.push_back(candidate);
-            }
-        }
+bool Player::issueOrder() {
+    if (strategy == nullptr) {
+        return false;
     }
-    return result;
-    
+    return strategy->issueOrder();
 }
+
+std::vector<Territory*> Player::toAttack() {
+    if (strategy == nullptr) {
+        return std::vector<Territory*>();
+    }
+    return strategy->toAttack();
+}
+
+std::vector<Territory*> Player::toDefend() {
+    if (strategy == nullptr) {
+        return std::vector<Territory*>();
+    }
+    return strategy->toDefend();
+}
+
+// Called by the GameEngine at the start of each issuing phase.
+void Player::beginIssuing() {
+    if (strategy != nullptr) {
+        strategy->beginIssuing();
+    }
+}
+
+PlayerStrategy* Player::getStrategy() const {
+    return strategy;
+}
+
+
+
 
 //creates an Order object and puts it in the player's list of orders
 // Issue a normal order.
@@ -294,81 +300,6 @@ void Player::releaseNeutralTerritory(Territory* territory) {
     territory->setOwner(nullptr);
 }
 
-void Player::beginIssuing() {
-    committedDeployArmies = 0;
-    issuingStep = 0;
-    finishedIssuing = false;
-}
-
-// Simple automatic policy: deploy, one defensive move, one attack, then usable cards.
-// No Order::validate() calls occur here. Execution checks the current game state.
-bool Player::issueOrder() {
-    if (finishedIssuing || territoryList.empty() || !ordersList) return false;
-    vector<Territory*> defend = toDefend();
-    vector<Territory*> attack = toAttack();
-    const int available = reinforcementPool - committedDeployArmies;
-    if (available > 0) {
-        ordersList->addOrder(new Deploy(this, defend.front(), available));
-        committedDeployArmies += available;
-        return true;
-    }
-    if (issuingStep == 0) {
-        ++issuingStep;
-        for (Territory* source : defend) {
-            int armies = source->getArmyCount() + (source == defend.front() ? committedDeployArmies : 0);
-            for (Territory* target : defend) {
-                const auto& adjacent = source->getAdjacentTerritories();
-                if (target != source && armies > 1 && std::any_of(adjacent.begin(), adjacent.end(),
-                    [target](Territory* t) { return t && t->getId() == target->getId(); })) {
-                    ordersList->addOrder(new Advance(this, source, target, 1));
-                    return true;
-                }
-            }
-        }
-    }
-    if (issuingStep == 1) {
-        ++issuingStep;
-        for (Territory* target : attack) {
-            for (Territory* source : defend) {
-                const auto& adjacent = source->getAdjacentTerritories();
-                int armies = source->getArmyCount() + (source == defend.front() ? committedDeployArmies : 0);
-                // Reserve one army for the optional defensive move.
-                if (armies > 1 && std::any_of(adjacent.begin(), adjacent.end(),
-                    [target](Territory* t) { return t && t->getId() == target->getId(); })) {
-                    ordersList->addOrder(new Advance(this, source, target, std::max(1, armies - 1)));
-                    return true;
-                }
-            }
-        }
-    }
-    if (cardHand && cardHand->getDeck()) {
-        for (Card* card : cardHand->getCards()) {
-            Order* order = nullptr;
-            switch (card->getType()) {
-                case CardType::BOMB:
-                    if (!attack.empty()) order = new Bomb(this, attack.front());
-                    break;
-                case CardType::BLOCKADE:
-                    if (defend.size() > 1) order = new Blockade(this, defend.back());
-                    break;
-                case CardType::AIRLIFT:
-                    if (defend.size() > 1) order = new Airlift(this, defend.front(), defend.back(), 1);
-                    break;
-                case CardType::DIPLOMACY:
-                    for (Territory* target : attack) if (target->getOwner()) {
-                        order = new Negotiate(this, target->getOwner()); break;
-                    }
-                    break;
-                case CardType::REINFORCEMENT:
-                    // This handout specifies no reinforcement-card effect; retain it.
-                    break;
-            }
-            if (order && playCardWithOrder(card, this, order)) return true;
-        }
-    }
-    finishedIssuing = true;
-    return false;
-}
 
 
 // Adding armies ( during the reinforcement phase )
@@ -459,6 +390,30 @@ void Player::setOrdersList(OrdersList* newOrders){
     ordersList = new OrdersList(*newOrders);     // deep copy FIRST (a separate list)
     delete oldOrders;                            // then free the old one
 };                
+
+
+
+// Gives the player a deep copy of newStrategy, bound to this player
+void Player::setStrategy(PlayerStrategy* newStrategy) {
+    // if the new strategy is the same as the current one, do nothing.
+    if (newStrategy == strategy) {
+        return;
+    }
+
+    PlayerStrategy* replacement = nullptr;
+
+    // If the new strategy is not null, clone it and point the copy at this player.
+    if (newStrategy != nullptr) {
+        replacement = newStrategy->clone();   // copy first, so a failure changes nothing
+        replacement->setPlayer(this);
+    }
+
+    // Swap the new strategy in and delete the old one.
+    PlayerStrategy* oldStrategy = strategy;
+    strategy = replacement;
+    delete oldStrategy;
+}
+
 
 //======Like the toString
 ostream& operator<<(ostream& out, const Player& p) {

@@ -8,16 +8,17 @@
 #include "Cards.h"
 #include "Orders.h"
 #include "Map.h"
+#include "PlayerStrategies.h"
 
 using namespace std;
+
+class PlayerStrategy; // Forward declaration to avoid circular dependency
 
 class Player {
 private:
     // Standalone players own copies; engine players borrow the map's territories.
     bool ownsTerritoryObjects = true;
-    int committedDeployArmies = 0;
-    int issuingStep = 0;
-    bool finishedIssuing = false;
+
     string name;
     vector<Territory*> territoryList;
     Hand* cardHand;
@@ -28,6 +29,9 @@ private:
     bool conqueredThisTurn = false;
     bool conquestCardAwardedThisTurn = false;
     std::vector<Player*> negotiatedPlayers;
+
+    // The strategy that makes this player's decisions. Owned by the player (deleted in the destructor)
+    PlayerStrategy* strategy;
 
     // Build the copies for the player that will keep them.
     Player(const Player& original, Player* destination);
@@ -77,18 +81,21 @@ public:
 
     void removeReinforcementArmies(int armies);
 
-    //==========ASSIGNMENT FUNCTION==================
+    //==========strategy function==================
 
     // Return territories that are to be defended
     vector<Territory*> toDefend();
 
     // Return territories that are to be attacked
     vector<Territory*> toAttack();
-
-    // Create an Order object and add it to the player's orders list
-    void issueOrder(string orderType);
     // Issue one decision per call; false means this player has passed for the turn.
     bool issueOrder();
+    PlayerStrategy* getStrategy() const;
+
+    //==========ASSIGNMENT FUNCTION==================
+    // Create an Order object and add it to the player's orders list
+    void issueOrder(string orderType);
+    
     void beginIssuing();
     // Replace owned copies with borrowed map territories (engine integration only).
     void bindMapTerritories(const vector<Territory*>& territories);
@@ -115,6 +122,9 @@ public:
     // NEW: Reinforcement pool management
     void setReinforcementPool(int armies);
     bool useReinforcements(int armies);
+
+    // Gives the player a new strategy. The player  retains ownership of newStrategy and deletes the old one.
+    void setStrategy(PlayerStrategy* newStrategy);
 
     //=====To String========
 
