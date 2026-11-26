@@ -16,7 +16,7 @@ class PlayerStrategy; // Forward declaration to avoid circular dependency
 
 class Player {
 private:
-    // Standalone players own copies; engine players borrow the map's territories.
+    // Standalone players own copies; engine players borrow the map's territories
     bool ownsTerritoryObjects = true;
 
     string name;
@@ -24,16 +24,15 @@ private:
     Hand* cardHand;
     OrdersList* ordersList;
 
-    // NEW: Available armies for deployment
+    // available armies for deployment
     int reinforcementPool = 0;
+    int reservedReinforcementArmies = 0;
     bool conqueredThisTurn = false;
     bool conquestCardAwardedThisTurn = false;
     std::vector<Player*> negotiatedPlayers;
 
-    // The strategy that makes this player's decisions. Owned by the player (deleted in the destructor)
     PlayerStrategy* strategy;
 
-    // Build the copies for the player that will keep them.
     Player(const Player& original, Player* destination);
 
 public:
@@ -91,6 +90,7 @@ public:
     // Issue one decision per call; false means this player has passed for the turn.
     bool issueOrder();
     PlayerStrategy* getStrategy() const;
+    void notifyAttacked();
 
     //==========ASSIGNMENT FUNCTION==================
     // Create an Order object and add it to the player's orders list
@@ -111,6 +111,8 @@ public:
 
     // NEW: Get available reinforcement armies
     int getReinforcementPool() const;
+    int getAvailableReinforcementArmies() const;
+    bool reserveReinforcementArmies(int armies);
 
     //==========SETTER FUNCTION==================
 

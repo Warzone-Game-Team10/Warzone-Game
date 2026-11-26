@@ -9,6 +9,7 @@
 #include <iostream>
 #include <sstream>
 #include <string>
+#include <algorithm>
 #include <vector>
 #include <map>
 
@@ -102,6 +103,10 @@ PlayerStrategy::~PlayerStrategy() {
 // Forgets everything that happened during the previous turn.
 void PlayerStrategy::beginIssuing() {
     finishedIssuing = false;
+}
+
+bool PlayerStrategy::shouldBecomeAggressiveWhenAttacked() const {
+    return false;
 }
 
 void PlayerStrategy::setPlayer(Player* owner) {
@@ -236,7 +241,8 @@ std::ostream& operator<<(std::ostream& out, const PlayerStrategy& strategy) {
 // ==================================================
 // HumanPlayerStrategy
 // ==================================================
-HumanPlayerStrategy::HumanPlayerStrategy(Player* player) : PlayerStrategy(player), committedDeployArmies(0) {
+HumanPlayerStrategy::HumanPlayerStrategy(Player* player)
+    : PlayerStrategy(player), committedDeployArmies(0) {
 }
 HumanPlayerStrategy::HumanPlayerStrategy(const HumanPlayerStrategy& other) : PlayerStrategy(other),
       committedDeployArmies(other.committedDeployArmies),
@@ -303,7 +309,7 @@ bool HumanPlayerStrategy::issueOrder() {
 
     // All reinforcements must be deployed before any other order.
     // If the player has armies left to deploy, ask for a Deploy order first.
-    int armiesLeftToDeploy = player->getReinforcementPool() - committedDeployArmies;
+    int armiesLeftToDeploy = player->getAvailableReinforcementArmies();
     if (armiesLeftToDeploy > 0) {
         return issueDeployOrder(armiesLeftToDeploy);
     }
@@ -336,10 +342,14 @@ bool HumanPlayerStrategy::issueDeployOrder(int armiesLeftToDeploy) {
 
     // create a new Deploy order and add it to the player's orders list
     Territory* target = defend[territoryChoice - 1];
+    if (!player->reserveReinforcementArmies(armyCount)) {
+        std::cout << "Those reinforcements are no longer available.\n";
+        return false;
+    }
+    committedDeployArmies += armyCount;
     player->getOrdersList()->addOrder(new Deploy(player, target, armyCount));
 
-    // Update the committedDeployArmies and deployedThisTurn to reflect the new deployment.
-    committedDeployArmies += armyCount;
+    // Track pending armies so later movement orders can use them.
     deployedThisTurn[target->getId()] += armyCount;
     return true;
 }
@@ -752,5 +762,278 @@ vector<Territory*> CheaterPlayerStrategy::toDefend()  {
 
 ostream& operator<<(ostream& out, const CheaterPlayerStrategy& cps) {
     out << "Cheater Player Strategy";
+    return out;
+}
+
+// aggressive player strat ---------------------------------------------------------------------------------------------------------------
+AggressivePlayerStrategy::AggressivePlayerStrategy(Player* player)
+    : PlayerStrategy(player) {}
+
+AggressivePlayerStrategy::AggressivePlayerStrategy(const AggressivePlayerStrategy& other)
+    : PlayerStrategy(other),
+      deployedThisTurn(other.deployedThisTurn),
+      advancedThisTurn(other.advancedThisTurn) {}
+
+AggressivePlayerStrategy& AggressivePlayerStrategy::operator=(const AggressivePlayerStrategy& other) {
+    if (this != &other) {
+        PlayerStrategy::operator=(other);
+        deployedThisTurn = other.deployedThisTurn;
+        advancedThisTurn = other.advancedThisTurn;
+    }
+    return *this;
+}
+
+PlayerStrategy* AggressivePlayerStrategy::clone() const {
+    return new AggressivePlayerStrategy(*this);
+}
+
+AggressivePlayerStrategy::~AggressivePlayerStrategy() {}
+
+void AggressivePlayerStrategy::beginIssuing() {
+    PlayerStrategy::beginIssuing();
+    deployedThisTurn.clear();
+    advancedThisTurn.clear();
+}
+
+bool AggressivePlayerStrategy::issueOrder() {
+    if (finishedIssuing || player == nullptr || player->getOrdersList() == nullptr) {
+        return false;
+    }
+
+    std::vector<Territory*> owned = toDefend();
+    if (owned.empty()) {
+        finishedIssuing = true;
+        return false;
+    }
+
+    const int armiesToDeploy = player->getAvailableReinforcementArmies();
+    if (armiesToDeploy > 0) {
+        Territory* strongest = owned.front();
+        if (!player->reserveReinforcementArmies(armiesToDeploy)) {
+            finishedIssuing = true;
+            return false;
+        }
+        player->getOrdersList()->addOrder(new Deploy(player, strongest, armiesToDeploy));
+        deployedThisTurn[strongest->getId()] += armiesToDeploy;
+        return true;
+    }
+
+    Territory* strongest = nullptr;
+    int strongestAvailable = 0;
+    for (Territory* territory : owned) {
+        int available = territory->getArmyCount() +
+                        getValueOrZero(deployedThisTurn, territory->getId()) -
+                        getValueOrZero(advancedThisTurn, territory->getId());
+        if (available > strongestAvailable) {
+            strongest = territory;
+            strongestAvailable = available;
+        }
+    }
+
+    if (strongest == nullptr || strongestAvailable <= 1) {
+        finishedIssuing = true;
+        return false;
+    }
+
+    std::vector<Territory*> targets = toAttack();
+    for (Territory* target : targets) {
+        bool adjacentToStrongest = false;
+        for (Territory* neighbour : strongest->getAdjacentTerritories()) {
+            if (neighbour != nullptr && neighbour->getId() == target->getId()) {
+                adjacentToStrongest = true;
+                break;
+            }
+        }
+        if (!adjacentToStrongest) {
+            continue;
+        }
+
+        const int armiesToAdvance = strongestAvailable - 1;
+        player->getOrdersList()->addOrder(new Advance(player, strongest, target, armiesToAdvance));
+        advancedThisTurn[strongest->getId()] += armiesToAdvance;
+        return true;
+    }
+
+    finishedIssuing = true;
+    return false;
+}
+
+vector<Territory*> AggressivePlayerStrategy::toAttack() {
+    std::vector<Territory*> targets = findAdjacentEnemyTerritories();
+    std::stable_sort(targets.begin(), targets.end(), [](Territory* left, Territory* right) {
+        if (left->getArmyCount() != right->getArmyCount()) {
+            return left->getArmyCount() < right->getArmyCount();
+        }
+        return left->getId() < right->getId();
+    });
+    return targets;
+}
+
+vector<Territory*> AggressivePlayerStrategy::toDefend() {
+    std::vector<Territory*> owned = findOwnedTerritories();
+    std::stable_sort(owned.begin(), owned.end(), [](Territory* left, Territory* right) {
+        if (left->getArmyCount() != right->getArmyCount()) {
+            return left->getArmyCount() > right->getArmyCount();
+        }
+        return left->getId() < right->getId();
+    });
+    return owned;
+}
+
+ostream& operator<<(ostream& out, const AggressivePlayerStrategy&) {
+    out << "Aggressive Player Strategy";
+    return out;
+}
+
+// benevolent player strat -----------------------------------------------------------------------------------------
+BenevolentPlayerStrategy::BenevolentPlayerStrategy(Player* player)
+    : PlayerStrategy(player) {}
+
+BenevolentPlayerStrategy::BenevolentPlayerStrategy(const BenevolentPlayerStrategy& other)
+    : PlayerStrategy(other),
+      deployedThisTurn(other.deployedThisTurn),
+      advancedThisTurn(other.advancedThisTurn),
+      receivedThisTurn(other.receivedThisTurn) {}
+
+BenevolentPlayerStrategy& BenevolentPlayerStrategy::operator=(const BenevolentPlayerStrategy& other) {
+    if (this != &other) {
+        PlayerStrategy::operator=(other);
+        deployedThisTurn = other.deployedThisTurn;
+        advancedThisTurn = other.advancedThisTurn;
+        receivedThisTurn = other.receivedThisTurn;
+    }
+    return *this;
+}
+
+PlayerStrategy* BenevolentPlayerStrategy::clone() const {
+    return new BenevolentPlayerStrategy(*this);
+}
+
+BenevolentPlayerStrategy::~BenevolentPlayerStrategy() {}
+
+void BenevolentPlayerStrategy::beginIssuing() {
+    PlayerStrategy::beginIssuing();
+    deployedThisTurn.clear();
+    advancedThisTurn.clear();
+    receivedThisTurn.clear();
+}
+
+bool BenevolentPlayerStrategy::issueOrder() {
+    if (finishedIssuing || player == nullptr || player->getOrdersList() == nullptr) {
+        return false;
+    }
+
+    std::vector<Territory*> owned = toDefend();
+    if (owned.empty()) {
+        finishedIssuing = true;
+        return false;
+    }
+
+    const int armiesToDeploy = player->getAvailableReinforcementArmies();
+    if (armiesToDeploy > 0) {
+        Territory* weakest = owned.front();
+        if (!player->reserveReinforcementArmies(armiesToDeploy)) {
+            finishedIssuing = true;
+            return false;
+        }
+        player->getOrdersList()->addOrder(new Deploy(player, weakest, armiesToDeploy));
+        deployedThisTurn[weakest->getId()] += armiesToDeploy;
+        return true;
+    }
+
+    for (Territory* weakest : owned) {
+        Territory* strongestNeighbour = nullptr;
+        const int weakestProjectedArmies = weakest->getArmyCount() +
+                                           getValueOrZero(deployedThisTurn, weakest->getId()) -
+                                           getValueOrZero(advancedThisTurn, weakest->getId()) +
+                                           getValueOrZero(receivedThisTurn, weakest->getId());
+        int strongestAvailable = weakestProjectedArmies;
+
+        for (Territory* neighbour : weakest->getAdjacentTerritories()) {
+            if (neighbour == nullptr || !player->ownsTerritory(neighbour) ||
+                getValueOrZero(receivedThisTurn, neighbour->getId()) > 0) {
+                continue;
+            }
+
+            const int available = neighbour->getArmyCount() +
+                                  getValueOrZero(deployedThisTurn, neighbour->getId()) -
+                                  getValueOrZero(advancedThisTurn, neighbour->getId());
+            if (available > 1 && available > strongestAvailable) {
+                strongestAvailable = available;
+                strongestNeighbour = neighbour;
+            }
+        }
+
+        if (strongestNeighbour != nullptr) {
+            const int armiesToAdvance = strongestAvailable - 1;
+            player->getOrdersList()->addOrder(
+                new Advance(player, strongestNeighbour, weakest, armiesToAdvance));
+            advancedThisTurn[strongestNeighbour->getId()] += armiesToAdvance;
+            receivedThisTurn[weakest->getId()] += armiesToAdvance;
+            return true;
+        }
+    }
+
+    finishedIssuing = true;
+    return false;
+}
+
+vector<Territory*> BenevolentPlayerStrategy::toAttack() {
+    return std::vector<Territory*>();
+}
+
+vector<Territory*> BenevolentPlayerStrategy::toDefend() {
+    std::vector<Territory*> owned = findOwnedTerritories();
+    std::stable_sort(owned.begin(), owned.end(), [](Territory* left, Territory* right) {
+        if (left->getArmyCount() != right->getArmyCount()) {
+            return left->getArmyCount() < right->getArmyCount();
+        }
+        return left->getId() < right->getId();
+    });
+    return owned;
+}
+
+ostream& operator<<(ostream& out, const BenevolentPlayerStrategy&) {
+    out << "Benevolent Player Strategy";
+    return out;
+}
+
+// neutral player strat ----------------------------------------------------------------------------------------------------------
+NeutralPlayerStrategy::NeutralPlayerStrategy(Player* player) : PlayerStrategy(player) {}
+
+NeutralPlayerStrategy::NeutralPlayerStrategy(const NeutralPlayerStrategy& other)
+    : PlayerStrategy(other) {}
+
+NeutralPlayerStrategy& NeutralPlayerStrategy::operator=(const NeutralPlayerStrategy& other) {
+    if (this != &other) {
+        PlayerStrategy::operator=(other);
+    }
+    return *this;
+}
+
+PlayerStrategy* NeutralPlayerStrategy::clone() const {
+    return new NeutralPlayerStrategy(*this);
+}
+
+NeutralPlayerStrategy::~NeutralPlayerStrategy() {}
+
+bool NeutralPlayerStrategy::shouldBecomeAggressiveWhenAttacked() const {
+    return true;
+}
+
+bool NeutralPlayerStrategy::issueOrder() {
+    return false;
+}
+
+vector<Territory*> NeutralPlayerStrategy::toAttack() {
+    return std::vector<Territory*>();
+}
+
+vector<Territory*> NeutralPlayerStrategy::toDefend() {
+    return findOwnedTerritories();
+}
+
+ostream& operator<<(ostream& out, const NeutralPlayerStrategy&) {
+    out << "Neutral Player Strategy";
     return out;
 }

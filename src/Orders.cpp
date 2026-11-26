@@ -353,6 +353,9 @@ void Advance::execute() {
         } else {
             // An enemy's owned copy is authoritative when available.
             Player* defender = target->getOwner();
+            if (defender != nullptr && defender != issuer) {
+                defender->notifyAttacked();
+            }
             Territory* destination = defender ? findOwnedTerritory(defender, target) : nullptr;
             if (!destination) destination = target; // neutral territory
             const int initialDefenders = destination->getArmyCount();

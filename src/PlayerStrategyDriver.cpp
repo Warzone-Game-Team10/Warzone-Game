@@ -581,12 +581,121 @@ bool testCheaterPlayerStrategy(const std::string& mapPath) {
     return allPassed;
 }
 
+bool testComputerPlayerStrategies() {
+    std::cout << "\n===== COMPUTER STRATEGY TEST =====\n";
+    bool allPassed = true;
+
+    Map map;
+
+    Territory* aggressiveStronghold = map.addTerritory(1, "Aggressive Stronghold");
+    Territory* aggressiveTarget = map.addTerritory(2, "Aggressive Target");
+    Territory* benevolentWeak = map.addTerritory(3, "Benevolent Weak");
+    Territory* benevolentStrong = map.addTerritory(4, "Benevolent Strong");
+    Territory* benevolentTarget = map.addTerritory(5, "Benevolent Target");
+    Territory* attackerSource = map.addTerritory(6, "Attacker Source");
+    Territory* neutralTarget = map.addTerritory(7, "Neutral Target");
+
+    aggressiveStronghold->addAdjacentTerritory(aggressiveTarget);
+    aggressiveTarget->addAdjacentTerritory(aggressiveStronghold);
+    aggressiveStronghold->addAdjacentTerritory(neutralTarget);
+    neutralTarget->addAdjacentTerritory(aggressiveStronghold);
+    benevolentWeak->addAdjacentTerritory(benevolentStrong);
+    benevolentStrong->addAdjacentTerritory(benevolentWeak);
+    benevolentStrong->addAdjacentTerritory(benevolentTarget);
+    benevolentTarget->addAdjacentTerritory(benevolentStrong);
+    attackerSource->addAdjacentTerritory(neutralTarget);
+    neutralTarget->addAdjacentTerritory(attackerSource);
+
+    Player aggressive("Aggressive", nullptr, nullptr, {});
+    Player benevolent("Benevolent", nullptr, nullptr, {});
+    Player neutral("Neutral", nullptr, nullptr, {});
+    Player attacker("Attacker", nullptr, nullptr, {});
+
+    aggressive.bindMapTerritories({aggressiveStronghold});
+    benevolent.bindMapTerritories({benevolentWeak, benevolentStrong});
+    neutral.bindMapTerritories({neutralTarget});
+    attacker.bindMapTerritories({attackerSource});
+
+    Player aggressiveOpponent("Aggressive opponent", nullptr, nullptr, {});
+    Player benevolentOpponent("Benevolent opponent", nullptr, nullptr, {});
+    
+    aggressiveOpponent.bindMapTerritories({aggressiveTarget});
+    benevolentOpponent.bindMapTerritories({benevolentTarget});
+
+    aggressiveStronghold->setArmyCount(10);
+    aggressiveTarget->setArmyCount(0);
+    benevolentWeak->setArmyCount(1);
+    benevolentStrong->setArmyCount(8);
+    benevolentTarget->setArmyCount(0);
+    neutralTarget->setArmyCount(0);
+    attackerSource->setArmyCount(20);
+
+    AggressivePlayerStrategy aggressivePrototype(&aggressive);
+    BenevolentPlayerStrategy benevolentPrototype(&benevolent);
+    NeutralPlayerStrategy neutralPrototype(&neutral);
+
+    aggressive.setStrategy(&aggressivePrototype);
+    benevolent.setStrategy(&benevolentPrototype);
+    neutral.setStrategy(&neutralPrototype);
+    aggressive.addReinforcementArmies(5);
+    benevolent.addReinforcementArmies(4);
+
+    aggressive.beginIssuing();
+    benevolent.beginIssuing();
+    
+    // check if different strats deploy to the strongest (Aggressive) and weakest (Benevolent)
+    check(allPassed,
+          aggressive.issueOrder() && benevolent.issueOrder() &&
+          describeOrder(aggressive, 0).find("Deploy 5 armies to Aggressive Stronghold") != std::string::npos &&
+          describeOrder(benevolent, 0).find("Deploy 4 armies to Benevolent Weak") != std::string::npos,
+          "different strategies deploy to the strongest and weakest territories");
+    // check behavior when aggressive attacks and benevolent advances, if beneevolent reinforces weak ally
+    check(allPassed,
+          aggressive.issueOrder() && benevolent.issueOrder() &&
+          describeOrder(aggressive, 1).find("Advance 14 armies from Aggressive Stronghold to Aggressive Target") != std::string::npos &&
+          describeOrder(benevolent, 1).find("Advance 7 armies from Benevolent Strong to Benevolent Weak") != std::string::npos,
+          "aggressive attacks while benevolent advances only to reinforce a weak ally");
+    // make sure benevolent cant select enemy territories
+    check(allPassed, benevolent.toAttack().empty(),
+          "benevolent never selects enemy territories");
+    // make sure issueOrder() returns false when no more defensive advances are possible
+    check(allPassed, !benevolent.issueOrder(),
+          "benevolent stops when no more defensive advances are possible");
+
+    benevolent.setStrategy(&aggressivePrototype);
+    // player is able to accept a change of strat during play
+    check(allPassed,
+          dynamic_cast<AggressivePlayerStrategy*>(benevolent.getStrategy()) != nullptr,
+          "the player accepts a strategy change during play");
+    const bool switchedPlayerIssued = benevolent.issueOrder();
+    // issueOrder() after strat switch and then check that the third queued order advances 7 armies
+    check(allPassed,
+          switchedPlayerIssued &&
+          describeOrder(benevolent, 2).find("Advance 7 armies from Benevolent Strong to Benevolent Target") != std::string::npos,
+          "the changed strategy issues its aggressive attack");
+    // check neutral has a neutral strategy, so issueOrder() returns false and orderlist remains empty
+    check(allPassed,
+          dynamic_cast<NeutralPlayerStrategy*>(neutral.getStrategy()) != nullptr &&
+          !neutral.issueOrder() && neutral.getOrdersList()->getSize() == 0,
+          "neutral players issue no orders automatically");
+    
+    Advance attackNeutral(&attacker, attackerSource, neutralTarget, 20);
+    attackNeutral.execute();
+    // executes an advance against neutral, then check strat has changed to agressive (check strat change behvaior)
+    check(allPassed,
+          dynamic_cast<AggressivePlayerStrategy*>(neutral.getStrategy()) != nullptr,
+          "a neutral player becomes aggressive when attacked");
+
+    return allPassed;
+}
+
 bool testPlayerStrategy() {
     const std::string mapPath = "maps/nyc/NYC.map";
     bool clonePassed = testPlayerStrategyClone();
     bool humanPassed = testHumanPlayerStrategy(mapPath);
+    bool computerPassed = testComputerPlayerStrategies();
     bool cheaterPassed = testCheaterPlayerStrategy(mapPath);
 
-    return clonePassed && humanPassed && cheaterPassed;
+    return clonePassed && humanPassed && computerPassed && cheaterPassed;
    
 }
