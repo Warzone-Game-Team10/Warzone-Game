@@ -61,7 +61,9 @@ Player::Player(const Player& original) : Player(original, this) {}
 // Assignment can prepare the copies before giving them to the destination player.
 Player::Player(const Player& original, Player* destination)
     : name(original.name), territoryList(), cardHand(nullptr), ordersList(nullptr),
-      reinforcementPool(original.reinforcementPool), conqueredThisTurn(original.conqueredThisTurn),
+      reinforcementPool(original.reinforcementPool),
+      reservedReinforcementArmies(original.reservedReinforcementArmies),
+      conqueredThisTurn(original.conqueredThisTurn),
       conquestCardAwardedThisTurn(original.conquestCardAwardedThisTurn) {
 
     
@@ -126,6 +128,7 @@ Player& Player::operator=(const Player& other) {
         std::swap(cardHand, replacement.cardHand);
         std::swap(ordersList, replacement.ordersList);
         std::swap(reinforcementPool, replacement.reinforcementPool);
+        std::swap(reservedReinforcementArmies, replacement.reservedReinforcementArmies);
         std::swap(conqueredThisTurn, replacement.conqueredThisTurn);
         std::swap(conquestCardAwardedThisTurn, replacement.conquestCardAwardedThisTurn);
         negotiatedPlayers.clear();
@@ -265,6 +268,7 @@ std::vector<Territory*> Player::toDefend() {
 
 // Called by the GameEngine at the start of each issuing phase.
 void Player::beginIssuing() {
+    reservedReinforcementArmies = 0;
     if (strategy != nullptr) {
         strategy->beginIssuing();
     }
@@ -274,6 +278,12 @@ PlayerStrategy* Player::getStrategy() const {
     return strategy;
 }
 
+void Player::notifyAttacked() {
+    if (strategy != nullptr && strategy->shouldBecomeAggressiveWhenAttacked()) {
+        AggressivePlayerStrategy aggressive(this);
+        setStrategy(&aggressive);
+    }
+}
 
 
 
@@ -437,9 +447,22 @@ ostream& operator<<(ostream& out, const Player& p) {
     return out;
 }
 
-// Reinforcement pool management for Assignment 2.
+// Reinforcement pool management
 int Player::getReinforcementPool() const {
     return reinforcementPool;
+}
+
+// retursn reinforcement pool - armies already reserved for deploy orders
+int Player::getAvailableReinforcementArmies() const {
+    return std::max(0, reinforcementPool - reservedReinforcementArmies);
+}
+// return nb of armies if still available + increase reserved count on success
+bool Player::reserveReinforcementArmies(int armies) {
+    if (armies <= 0 || armies > getAvailableReinforcementArmies()) {
+        return false;
+    }
+    reservedReinforcementArmies += armies;
+    return true;
 }
 
 void Player::setReinforcementPool(int armies) {

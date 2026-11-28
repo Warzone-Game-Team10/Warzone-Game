@@ -30,16 +30,16 @@ PlayerStrategies.o: src/PlayerStrategies.cpp include/PlayerStrategies.h include/
 PlayerStrategyDriver.o: src/PlayerStrategyDriver.cpp include/PlayerStrategyDriver.h include/Player.h include/PlayerStrategies.h
 	g++ -std=c++20 -Iinclude -c src/PlayerStrategyDriver.cpp -o PlayerStrategyDriver.o
 
-Orders.o: src/Orders.cpp include/Orders.h
+Orders.o: src/Orders.cpp include/Orders.h include/Player.h
 	g++ -std=c++20 -Iinclude -c src/Orders.cpp -o Orders.o
 
 OrdersDriver.o: src/OrdersDriver.cpp include/OrdersDriver.h include/Orders.h
 	g++ -std=c++20 -Iinclude -c src/OrdersDriver.cpp -o OrdersDriver.o
 
-GameEngineDriver.o: src/GameEngineDriver.cpp include/GameEngineDriver.h include/GameEngine.h include/CommandProcessing.h
+GameEngineDriver.o: src/GameEngineDriver.cpp include/GameEngineDriver.h include/GameEngine.h include/CommandProcessing.h include/Player.h
 	g++ -std=c++20 -Iinclude -c src/GameEngineDriver.cpp -o GameEngineDriver.o
 
-GameEngine.o: src/GameEngine.cpp include/GameEngine.h include/CommandProcessing.h
+GameEngine.o: src/GameEngine.cpp include/GameEngine.h include/CommandProcessing.h include/Player.h
 	g++ -std=c++20 -Iinclude -c src/GameEngine.cpp -o GameEngine.o
 
 CommandProcessing.o: src/CommandProcessing.cpp include/CommandProcessing.h
@@ -63,6 +63,9 @@ run: output
 run-engine: output
 	./warzone-tests.exe gameengine
 
+run-playerstrategy: output
+	./warzone-tests.exe playerstrategy
+
 card-smoke.exe: tests/CardIntegrationSmokeTest.cpp $(CARD_SMOKE_SRCS)
 	g++ -std=c++20 -Wall -Wextra -Iinclude tests/CardIntegrationSmokeTest.cpp $(CARD_SMOKE_SRCS) -o card-smoke.exe
 
@@ -78,4 +81,4 @@ clean:
 clear: 
 	rm -f *.o warzone-tests.exe card-smoke.exe
 
-.PHONY: output run run-engine run-card-smoke run-startup clean clear
+.PHONY: output run run-engine run-playerstrategy run-card-smoke run-startup clean clear

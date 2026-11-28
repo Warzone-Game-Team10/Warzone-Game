@@ -1,6 +1,7 @@
 #pragma once
 
 #include <stdio.h>
+#include <unordered_map>
 #include <vector>
 #include <string>
 #include "Map.h"
@@ -30,6 +31,7 @@ class PlayerStrategy {
         
         //helpers
         virtual void beginIssuing();
+        virtual bool shouldBecomeAggressiveWhenAttacked() const;
         void setPlayer(Player* player);
         // The territories that touch one of the player's territories but are not the player's own.
         vector<Territory*> findAdjacentEnemyTerritories() const;
@@ -49,7 +51,7 @@ class HumanPlayerStrategy : public PlayerStrategy {
     public:
 
         //atributes
-        int committedDeployArmies;                 // armies already promised to Deploy orders
+        int committedDeployArmies;
         std::unordered_map<int, int> deployedThisTurn; // territory ID -> armies deployed there this turn
         std::unordered_map<int, int> advancedThisTurn; // territory ID -> armies ordered
 
@@ -94,11 +96,15 @@ class CheaterPlayerStrategy : public PlayerStrategy {
 
 class AggressivePlayerStrategy : public PlayerStrategy {
     public:
+        std::unordered_map<int, int> deployedThisTurn;
+        std::unordered_map<int, int> advancedThisTurn;
+
         AggressivePlayerStrategy(Player* player);
         AggressivePlayerStrategy(const AggressivePlayerStrategy& other);
         AggressivePlayerStrategy& operator=(const AggressivePlayerStrategy& other);
         PlayerStrategy* clone() const override;
         ~AggressivePlayerStrategy();
+        void beginIssuing() override;
         bool issueOrder() override;
         vector<Territory*> toAttack() override;
         vector<Territory*> toDefend() override;
@@ -109,11 +115,16 @@ class AggressivePlayerStrategy : public PlayerStrategy {
 
 class BenevolentPlayerStrategy : public PlayerStrategy {
     public:
+        std::unordered_map<int, int> deployedThisTurn;
+        std::unordered_map<int, int> advancedThisTurn;
+        std::unordered_map<int, int> receivedThisTurn;
+
         BenevolentPlayerStrategy(Player* player);
         BenevolentPlayerStrategy(const BenevolentPlayerStrategy& other);
         BenevolentPlayerStrategy& operator=(const BenevolentPlayerStrategy& other);
         PlayerStrategy* clone() const override;
         ~BenevolentPlayerStrategy();
+        void beginIssuing() override;
         bool issueOrder() override;
         vector<Territory*> toAttack() override;
         vector<Territory*> toDefend() override;
@@ -129,6 +140,7 @@ class NeutralPlayerStrategy : public PlayerStrategy {
         NeutralPlayerStrategy& operator=(const NeutralPlayerStrategy& other);
         PlayerStrategy* clone() const override;
         ~NeutralPlayerStrategy();
+        bool shouldBecomeAggressiveWhenAttacked() const override;
         bool issueOrder() override;
         vector<Territory*> toAttack() override;
         vector<Territory*> toDefend() override;

@@ -30,6 +30,7 @@ GNU Make and a C++20-compatible `g++` compiler are required.
 | `make output` | Compiles and links the project into `warzone-tests.exe`. |
 | `make run` | Builds `warzone-tests.exe` if needed, then runs its `all` test drivers. |
 | `make run-engine` | Builds the executable if needed, then runs the interactive GameEngine state-transition driver. It waits for commands in the terminal. |
+| `make run-playerstrategy` | Builds the executable if needed, then runs only the player-strategy test driver, including the computer strategy tests. |
 | `make run-startup` | Builds the executable if needed, then runs the scripted startup-phase demonstration and checks. |
 | `make run-card-smoke` | Builds `card-smoke.exe` from `tests/CardIntegrationSmokeTest.cpp` and the project source files (excluding `MainDriver.cpp`), then runs the card/order integration checks. |
 | `make clean` | Removes generated `.o` files, `warzone-tests.exe`, and `card-smoke.exe` using the Windows `del` command. |
